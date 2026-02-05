@@ -1,0 +1,22 @@
+node_modules
+dist
+out
+.DS_Store
+.eslintcache
+*.log*
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# macOS metadata
+._*
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Build/Dist folders
+dist-web
+build
+out

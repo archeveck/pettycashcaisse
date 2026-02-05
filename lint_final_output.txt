@@ -1,0 +1,52 @@
+
+> caisse-pettycash@1.0.0 lint
+> eslint --cache .
+
+
+/Users/macbookairm2/Documents/caissePettycash/src/renderer/src/components/ProofAlerts.tsx
+  21:38  warning  Replace `·daysThreshold·=·3·` with `⏎··daysThreshold·=·3⏎`  prettier/prettier
+
+/Users/macbookairm2/Documents/caissePettycash/src/renderer/src/pages/ClosureHistory.tsx
+   93:1   warning  Delete `⏎⏎`                         prettier/prettier
+  207:51  warning  Insert `⏎························`  prettier/prettier
+  208:1   warning  Delete `··`                         prettier/prettier
+  223:27  warning  Insert `··`                         prettier/prettier
+  224:27  warning  Insert `··`                         prettier/prettier
+  225:1   warning  Insert `··`                         prettier/prettier
+
+/Users/macbookairm2/Documents/caissePettycash/src/renderer/src/pages/Dashboard.tsx
+   53:54  warning  Replace `.from('cash_transactions')` with `⏎··········.from('cash_transactions')⏎··········`  prettier/prettier
+  214:13  warning  Delete `··`                                                                                   prettier/prettier
+  215:15  warning  Delete `··`                                                                                   prettier/prettier
+  216:1   warning  Replace `················` with `··············`                                              prettier/prettier
+  217:1   warning  Delete `··`                                                                                   prettier/prettier
+  218:1   warning  Replace `····················` with `··················`                                      prettier/prettier
+  219:21  warning  Delete `··`                                                                                   prettier/prettier
+  220:1   warning  Delete `··`                                                                                   prettier/prettier
+  221:19  warning  Delete `··`                                                                                   prettier/prettier
+  222:1   warning  Delete `··`                                                                                   prettier/prettier
+  223:17  warning  Delete `··`                                                                                   prettier/prettier
+  224:19  warning  Delete `··`                                                                                   prettier/prettier
+  225:1   warning  Replace `······················` with `····················`                                  prettier/prettier
+  226:21  warning  Delete `··`                                                                                   prettier/prettier
+  227:1   warning  Replace `····················` with `··················`                                      prettier/prettier
+  228:17  warning  Delete `··`                                                                                   prettier/prettier
+  229:1   warning  Delete `··`                                                                                   prettier/prettier
+  230:13  warning  Delete `··`                                                                                   prettier/prettier
+  231:1   warning  Delete `··`                                                                                   prettier/prettier
+
+/Users/macbookairm2/Documents/caissePettycash/src/renderer/src/pages/Reports.tsx
+  82:6  warning  React Hook useEffect has a missing dependency: 'fetchTransactions'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/macbookairm2/Documents/caissePettycash/src/renderer/src/pages/Settings.tsx
+  50:6  warning  React Hook useEffect has a missing dependency: 'loadData'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/macbookairm2/Documents/caissePettycash/src/renderer/src/pages/Transactions.tsx
+  55:6  warning  React Hook useEffect has a missing dependency: 'fetchTransactions'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/macbookairm2/Documents/caissePettycash/src/renderer/src/pages/Validations.tsx
+  77:6  warning  React Hook useEffect has a missing dependency: 'fetchPendingRequests'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+✖ 30 problems (0 errors, 30 warnings)
+  0 errors and 26 warnings potentially fixable with the `--fix` option.
+
