@@ -12,6 +12,12 @@ export interface OdooProject {
   name: string
 }
 
+export interface OdooAccountAccount {
+  id: number
+  name: string
+  code: string
+}
+
 export interface OdooAnalyticalAccount {
   id: number
   name: string
@@ -76,9 +82,24 @@ export const fetchOdooSuppliers = async (
   ])
 }
 
+export const fetchOdooAccountAccounts = async (
+  config: OdooConfig,
+  uid: number
+): Promise<OdooAccountAccount[]> => {
+  return odooCall<OdooAccountAccount[]>(config, 'object', 'execute_kw', [
+    config.db,
+    uid,
+    config.password,
+    'account.account',
+    'search_read',
+    [[['deprecated', '=', false], ['company_id', '=', 1]]],
+    { fields: ['id', 'name', 'code'] }
+  ])
+}
+
 export const syncOdooData = async (
   config: OdooConfig
-): Promise<{ projects: number; accounts: number; suppliers: number }> => {
+): Promise<{ projects: number; accounts: number; suppliers: number; accountingAccounts: number }> => {
   const uid = await authenticateOdoo(config)
   if (!uid) throw new Error('Échec de l’authentification Odoo')
 
@@ -178,11 +199,15 @@ export const syncOdooData = async (
 
   // Désactiver les projets locaux qui ne sont plus dans Odoo (uniquement ceux qui ont un odoo_id)
   const odooProjectIds = odooProjects.map((p) => p.id)
-  await supabase
-    .from('projects')
-    .update({ active: false })
-    .not('odoo_id', 'is', null)
-    .not('odoo_id', 'in', `(${odooProjectIds.join(',')})`)
+  if (odooProjectIds.length > 0) {
+    await supabase
+      .from('projects')
+      .update({ active: false })
+      .not('odoo_id', 'is', null)
+      .not('odoo_id', 'in', `(${odooProjectIds.join(',')})`)
+  } else {
+    await supabase.from('projects').update({ active: false }).not('odoo_id', 'is', null)
+  }
 
   // 4. Synchroniser les comptes analytiques
   const { data: localProjects } = await supabase.from('projects').select('id, odoo_id, name')
@@ -247,7 +272,8 @@ export const syncOdooData = async (
         .update({
           name: oa.name,
           code: accountCode,
-          project_id: localProjectId
+          project_id: localProjectId,
+          active: true
         })
         .eq('id', existingByOdoo.id)
     } else {
@@ -266,7 +292,8 @@ export const syncOdooData = async (
             .from('analytical_accounts')
             .update({
               name: oa.name,
-              odoo_id: oa.id
+              odoo_id: oa.id,
+              active: true
             })
             .eq('id', existingByCode.id)
         } else {
@@ -277,7 +304,8 @@ export const syncOdooData = async (
             name: oa.name,
             code: uniqueCode,
             project_id: localProjectId,
-            odoo_id: oa.id
+            odoo_id: oa.id,
+            active: true
           })
         }
       } else {
@@ -286,14 +314,55 @@ export const syncOdooData = async (
           name: oa.name,
           code: accountCode,
           project_id: localProjectId,
-          odoo_id: oa.id
+          odoo_id: oa.id,
+          active: true
         })
       }
     }
     accountsSynced++
   }
 
-  // 5. Synchroniser les fournisseurs
+  // Désactiver les comptes analytiques locaux qui ne sont plus dans Odoo pour cette société
+  const odooAnalyticalAccountIds = odooAccounts.map((a) => a.id)
+  if (odooAnalyticalAccountIds.length > 0) {
+    await supabase
+      .from('analytical_accounts')
+      .update({ active: false })
+      .not('odoo_id', 'is', null)
+      .not('odoo_id', 'in', `(${odooAnalyticalAccountIds.join(',')})`)
+  } else {
+    await supabase.from('analytical_accounts').update({ active: false }).not('odoo_id', 'is', null)
+  }
+
+  // 6. Synchroniser les comptes comptables
+  const odooAccountAccounts = await fetchOdooAccountAccounts(config, uid)
+  let accountingAccountsSynced = 0
+
+  for (const oaa of odooAccountAccounts) {
+    const concatenatedName = `${oaa.code} ${oaa.name}`
+    const accountData = {
+      name: concatenatedName,
+      code: oaa.code,
+      odoo_id: oaa.id,
+      active: true
+    }
+    await supabase.from('accounting_accounts').upsert(accountData, { onConflict: 'odoo_id' })
+    accountingAccountsSynced++
+  }
+
+  // Désactiver les comptes locaux qui ne sont plus dans Odoo
+  const odooAccountAccountIds = odooAccountAccounts.map((a) => a.id)
+  if (odooAccountAccountIds.length > 0) {
+    await supabase
+      .from('accounting_accounts')
+      .update({ active: false })
+      .not('odoo_id', 'is', null)
+      .not('odoo_id', 'in', `(${odooAccountAccountIds.join(',')})`)
+  } else {
+    await supabase.from('accounting_accounts').update({ active: false }).not('odoo_id', 'is', null)
+  }
+
+  // 7. Synchroniser les fournisseurs
   const odooSuppliers = await fetchOdooSuppliers(config, uid)
   let suppliersSynced = 0
 
@@ -316,9 +385,13 @@ export const syncOdooData = async (
       .not('odoo_id', 'is', null)
       .not('odoo_id', 'in', `(${odooSupplierIds.join(',')})`)
   } else {
-    // Si aucun fournisseur n'est renvoyé par Odoo, on désactive tous ceux qui sont liés à Odoo
     await supabase.from('suppliers').update({ active: false }).not('odoo_id', 'is', null)
   }
 
-  return { projects: projectsSynced, accounts: accountsSynced, suppliers: suppliersSynced }
+  return {
+    projects: projectsSynced,
+    accounts: accountsSynced,
+    suppliers: suppliersSynced,
+    accountingAccounts: accountingAccountsSynced
+  }
 }

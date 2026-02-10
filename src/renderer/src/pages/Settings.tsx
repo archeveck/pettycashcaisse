@@ -18,15 +18,20 @@ import {
   getSuppliers,
   updateSupplier,
   deleteSupplier,
+  getAccountingAccounts,
+  createAccountingAccount,
+  updateAccountingAccount,
+  deleteAccountingAccount,
   type Project,
   type AnalyticalAccount,
   type UserProfile,
-  type Supplier
+  type Supplier,
+  type AccountingAccount
 } from '../services/settingsService'
 import { syncOdooData } from '../services/odooService'
 import { getErrorMessage } from '../utils/errorUtils'
 
-type TabType = 'app' | 'projects' | 'accounts' | 'suppliers' | 'users' | 'odoo'
+type TabType = 'app' | 'projects' | 'accounts' | 'accounting' | 'suppliers' | 'users' | 'odoo'
 
 export default function Settings(): React.ReactElement {
   const { profile } = useAuth()
@@ -55,6 +60,11 @@ export default function Settings(): React.ReactElement {
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false)
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null)
+
+  // Accounting Accounts
+  const [accountingAccounts, setAccountingAccounts] = useState<AccountingAccount[]>([])
+  const [isAccountingModalOpen, setIsAccountingModalOpen] = useState(false)
+  const [editingAccountingAccount, setEditingAccountingAccount] = useState<AccountingAccount | null>(null)
 
   // Odoo Settings
   const [odooUrl, setOdooUrl] = useState('')
@@ -90,6 +100,9 @@ export default function Settings(): React.ReactElement {
       } else if (activeTab === 'suppliers') {
         const data = await getSuppliers()
         setSuppliers(data)
+      } else if (activeTab === 'accounting') {
+        const data = await getAccountingAccounts()
+        setAccountingAccounts(data)
       }
     } catch (err) {
       console.error('Error loading data:', err)
@@ -157,6 +170,16 @@ export default function Settings(): React.ReactElement {
     }
   }
 
+  const handleDeleteAccountingAccount = async (id: string): Promise<void> => {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer ce compte comptable ?')) return
+    try {
+      await deleteAccountingAccount(id)
+      setAccountingAccounts((prev) => prev.filter((a) => a.id !== id))
+    } catch (err: unknown) {
+      alert('Échec de la suppression du compte : ' + getErrorMessage(err))
+    }
+  }
+
   const handleSaveOdooConfig = async (): Promise<void> => {
     setIsSavingOdoo(true)
     try {
@@ -186,7 +209,9 @@ export default function Settings(): React.ReactElement {
         username: odooUser,
         password: odooPass
       })
-      alert(`Synchronisation terminée : ${result.projects} projets, ${result.accounts} comptes et ${result.suppliers} fournisseurs synchronisés.`)
+      alert(
+        `Synchronisation terminée : ${result.projects} projets, ${result.accounts} comptes analytiques, ${result.suppliers} fournisseurs et ${result.accountingAccounts} comptes comptables synchronisés.`
+      )
     } catch (err) {
       alert(`Erreur de synchronisation : ${getErrorMessage(err)}`)
     } finally {
@@ -198,6 +223,7 @@ export default function Settings(): React.ReactElement {
     { id: 'app' as TabType, label: 'Configuration', icon: SettingsIcon },
     { id: 'odoo' as TabType, label: 'ERP Odoo', icon: SettingsIcon },
     { id: 'projects' as TabType, label: 'Projets', icon: SettingsIcon },
+    { id: 'accounting' as TabType, label: 'Comptes Comptables', icon: SettingsIcon },
     { id: 'accounts' as TabType, label: 'Comptes Analytiques', icon: SettingsIcon },
     { id: 'suppliers' as TabType, label: 'Fournisseurs', icon: SettingsIcon },
     { id: 'users' as TabType, label: 'Utilisateurs', icon: SettingsIcon }
@@ -402,6 +428,71 @@ export default function Settings(): React.ReactElement {
           {/* Accounts Tab Content End */}
           {activeTab === 'accounts' && <div></div>}
 
+          {/* Accounting Tab */}
+          {activeTab === 'accounting' && (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h2 className="text-xl font-semibold">Comptes Comptables</h2>
+                <button
+                  onClick={() => {
+                    setEditingAccountingAccount(null)
+                    setIsAccountingModalOpen(true)
+                  }}
+                  className="flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Nouveau Compte
+                </button>
+              </div>
+
+              <div className="grid gap-4">
+                {accountingAccounts.length === 0 ? (
+                  <div className="p-8 text-center bg-card rounded-lg border border-dashed border-border text-muted-foreground">
+                    Aucun compte comptable trouvé. Synchronisez avec Odoo pour les importer.
+                  </div>
+                ) : (
+                  accountingAccounts.map((account) => (
+                    <div
+                      key={account.id}
+                      className="p-4 bg-card rounded-lg border border-border shadow-sm flex justify-between items-start"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold">{account.name}</h3>
+                          <span className="text-xs bg-secondary px-2 py-1 rounded">
+                            {account.code}
+                          </span>
+                          {!account.active && (
+                            <span className="text-xs bg-destructive/20 text-destructive px-2 py-1 rounded">
+                              Inactif
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setEditingAccountingAccount(account)
+                            setIsAccountingModalOpen(true)
+                          }}
+                          className="p-2 hover:bg-secondary rounded-md transition-colors"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteAccountingAccount(account.id)}
+                          className="p-2 hover:bg-destructive/20 text-destructive rounded-md transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Suppliers Tab */}
           {activeTab === 'suppliers' && (
             <div className="space-y-4">
@@ -589,6 +680,18 @@ export default function Settings(): React.ReactElement {
         </div>
       )}
 
+      {/* Accounting Account Modal */}
+      {isAccountingModalOpen && (
+        <AccountingAccountModal
+          account={editingAccountingAccount}
+          onClose={() => setIsAccountingModalOpen(false)}
+          onSave={() => {
+            setIsAccountingModalOpen(false)
+            loadData()
+          }}
+        />
+      )}
+
       {/* Project Modal */}
       {isProjectModalOpen && (
         <ProjectModal
@@ -710,6 +813,103 @@ function ProjectModal({
               className="w-4 h-4"
             />
             <label htmlFor="active" className="text-sm font-medium">
+              Actif
+            </label>
+          </div>
+
+          <div className="flex gap-2 justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border border-border rounded-md hover:bg-secondary transition-colors"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              {isSaving ? 'Enregistrement...' : 'Enregistrer'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// Accounting Account Modal Component
+function AccountingAccountModal({
+  account,
+  onClose,
+  onSave
+}: {
+  account: AccountingAccount | null
+  onClose: () => void
+  onSave: () => void
+}): React.ReactElement {
+  const [name, setName] = useState(account?.name || '')
+  const [code, setCode] = useState(account?.code || '')
+  const [active, setActive] = useState(account?.active ?? true)
+  const [isSaving, setIsSaving] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent): Promise<void> => {
+    e.preventDefault()
+    setIsSaving(true)
+
+    try {
+      if (account) {
+        await updateAccountingAccount(account.id, { name, code, active })
+      } else {
+        await createAccountingAccount({ name, code, active })
+      }
+      onSave()
+    } catch (err: unknown) {
+      alert("Échec de l'enregistrement du compte : " + getErrorMessage(err))
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-card p-6 rounded-lg border border-border shadow-lg max-w-md w-full">
+        <h2 className="text-xl font-semibold mb-4">
+          {account ? 'Modifier le Compte Comptable' : 'Nouveau Compte Comptable'}
+        </h2>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Nom</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Code</label>
+            <input
+              type="text"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              required
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="acc-active"
+              checked={active}
+              onChange={(e) => setActive(e.target.checked)}
+              className="w-4 h-4"
+            />
+            <label htmlFor="acc-active" className="text-sm font-medium">
               Actif
             </label>
           </div>

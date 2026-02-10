@@ -226,3 +226,50 @@ export const deleteSupplier = async (id: string): Promise<void> => {
 
   if (error) throw error
 }
+// Accounting Accounts
+export interface AccountingAccount {
+  id: string
+  name: string
+  code: string
+  active: boolean
+  odoo_id?: number
+  created_at: string
+}
+
+export const getAccountingAccounts = async (): Promise<AccountingAccount[]> => {
+  const { data, error } = await supabase
+    .from('accounting_accounts')
+    .select('*')
+    .order('code', { ascending: true })
+
+  if (error) throw error
+  return data as AccountingAccount[]
+}
+
+export const createAccountingAccount = async (
+  account: Omit<AccountingAccount, 'id' | 'created_at'>
+): Promise<AccountingAccount> => {
+  const { data, error } = await supabase
+    .from('accounting_accounts')
+    .insert(account)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data as AccountingAccount
+}
+
+export const updateAccountingAccount = async (
+  id: string,
+  updates: Partial<Omit<AccountingAccount, 'id' | 'created_at'>>
+): Promise<void> => {
+  const { error } = await supabase.from('accounting_accounts').update(updates).eq('id', id)
+
+  if (error) throw error
+}
+
+export const deleteAccountingAccount = async (id: string): Promise<void> => {
+  const { error } = await supabase.from('accounting_accounts').delete().eq('id', id)
+
+  if (error) throw error
+}

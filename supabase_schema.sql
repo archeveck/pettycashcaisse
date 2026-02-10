@@ -34,8 +34,19 @@ create table if not exists public.analytical_accounts (
   name text not null,
   code text not null,
   created_at timestamptz default now(),
+  active boolean default true,
   odoo_id integer unique,
   unique(project_id, code)
+);
+
+-- 4. ACCOUNTING ACCOUNTS (Standard Odoo account.account)
+create table if not exists public.accounting_accounts (
+  id uuid default uuid_generate_v4() primary key,
+  name text not null,
+  code text not null unique,
+  active boolean default true,
+  odoo_id integer unique,
+  created_at timestamptz default now()
 );
 
 -- 4. CASH REQUESTS
@@ -116,6 +127,7 @@ create table if not exists public.app_settings (
 alter table public.profiles enable row level security;
 alter table public.projects enable row level security;
 alter table public.analytical_accounts enable row level security;
+alter table public.accounting_accounts enable row level security;
 alter table public.cash_requests enable row level security;
 alter table public.cash_transactions enable row level security;
 alter table public.daily_closures enable row level security;
@@ -166,6 +178,7 @@ create policy "Users can update own profile." on public.profiles for update usin
 -- Projects/Accounts: Readable by authenticated users. Only Admin can manage.
 create policy "Projects viewable by authenticated" on public.projects for select using (auth.role() = 'authenticated');
 create policy "Analytical Accounts viewable by authenticated" on public.analytical_accounts for select using (auth.role() = 'authenticated');
+create policy "Accounting Accounts viewable by authenticated" on public.accounting_accounts for select using (auth.role() = 'authenticated');
 
 -- Requests:
 -- Requester can see own.
@@ -200,6 +213,17 @@ create policy "Admin can update analytical accounts" on public.analytical_accoun
   exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
 );
 create policy "Admin can delete analytical accounts" on public.analytical_accounts for delete using (
+  exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+);
+
+-- Admin policies for managing accounting accounts
+create policy "Admin can insert accounting accounts" on public.accounting_accounts for insert with check (
+  exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+);
+create policy "Admin can update accounting accounts" on public.accounting_accounts for update using (
+  exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+);
+create policy "Admin can delete accounting accounts" on public.accounting_accounts for delete using (
   exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
 );
 

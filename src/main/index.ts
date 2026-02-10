@@ -54,6 +54,7 @@ app.whenReady().then(() => {
 
   // Odoo API Handler (Bypass CORS)
   ipcMain.handle('odoo-request', async (_event, url, body) => {
+    console.log(`[Odoo Request] calling: ${url}`)
     try {
       const response = await fetch(url, {
         method: 'POST',
@@ -62,8 +63,12 @@ app.whenReady().then(() => {
         },
         body: JSON.stringify(body)
       })
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
       return await response.json()
     } catch (error) {
+      console.error(`[Odoo Request Error] ${url}:`, error)
       return {
         jsonrpc: '2.0',
         error: {

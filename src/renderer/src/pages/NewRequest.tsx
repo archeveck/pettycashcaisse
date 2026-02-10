@@ -301,7 +301,7 @@ export default function NewRequest(): React.ReactElement {
               control={control}
               render={({ field }) => (
                 <SearchableSelect
-                  options={filteredAccounts}
+                  options={filteredAccounts as any}
                   value={field.value || ''}
                   onChange={field.onChange}
                   onBlur={field.onBlur}
@@ -332,7 +332,7 @@ export default function NewRequest(): React.ReactElement {
               control={control}
               render={({ field }) => (
                 <SearchableSelect
-                  options={suppliers}
+                  options={suppliers as any}
                   value={field.value || ''}
                   onChange={field.onChange}
                   onBlur={field.onBlur}
