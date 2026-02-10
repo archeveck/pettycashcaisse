@@ -10,13 +10,18 @@ export interface OdooConfig {
 export interface OdooProject {
   id: number
   name: string
-  analytic_account_id?: [number, string] | false
 }
 
 export interface OdooAnalyticalAccount {
   id: number
   name: string
   code: string
+  plan_id: [number, string]
+}
+
+export interface OdooSupplier {
+  id: number
+  name: string
 }
 
 async function odooCall<T>(
@@ -50,63 +55,116 @@ export const authenticateOdoo = async (config: OdooConfig): Promise<number> => {
   ])
 }
 
-export const fetchOdooProjects = async (config: OdooConfig, uid: number): Promise<OdooProject[]> => {
-  return odooCall<OdooProject[]>(config, 'object', 'execute_kw', [
+export const fetchOdooSuppliers = async (
+  config: OdooConfig,
+  uid: number
+): Promise<OdooSupplier[]> => {
+  return odooCall<OdooSupplier[]>(config, 'object', 'execute_kw', [
     config.db,
     uid,
     config.password,
-    'project.project',
+    'res.partner',
     'search_read',
-    [[['active', '=', true], ['company_id', '=', 1]]],
-    { fields: ['id', 'name', 'analytic_account_id'] }
+    [
+      [
+        ['active', '=', true],
+        ['supplier_rank', '>', 0],
+        ['company_id', '=', 1]
+      ]
+    ],
+    { fields: ['id', 'name'] }
   ])
 }
 
 export const syncOdooData = async (
   config: OdooConfig
-): Promise<{ projects: number; accounts: number }> => {
+): Promise<{ projects: number; accounts: number; suppliers: number }> => {
   const uid = await authenticateOdoo(config)
   if (!uid) throw new Error('Échec de l’authentification Odoo')
 
-  // 1. Récupérer les projets de la société filtrée (ex: HYD, PAD2, IRAH...)
-  const odooProjects = await fetchOdooProjects(config, uid)
-  
-  // Extraire les suffixes probables des projets (ex: de "HYDRO 1000", on aura peut-être besoin de "HYD")
-  // Note: Dans les logs, on voit "SIEGE", "AGENCE", "HYDRO 1000" et des suffixes "_HYD", "_PAD2"
-  // On va créer un mapping manuel ou basé sur les patterns observés
-  const suffixToProjectMap = new Map<string, number>()
-  for (const p of odooProjects) {
-    const name = p.name.toUpperCase()
-    if (name.includes('HYDRO 1000')) suffixToProjectMap.set('HYD', p.id)
-    if (name.includes('SIEGE')) suffixToProjectMap.set('SIEGE', p.id) // Fallback for name only
-    if (name.includes('AGENCE')) suffixToProjectMap.set('AGENCE', p.id)
-    // On peut aussi essayer d'extraire les 3 premières lettres ou des codes connus
-    if (name === 'SIEGE') suffixToProjectMap.set('SIG', p.id)
-    if (name === 'HYDRO 1000') suffixToProjectMap.set('HYDRO', p.id)
-  }
-
-  // 2. Récupérer TOUS les comptes analytiques actifs
+  // 1. Récupérer les COMPTES analytiques de la société (company_id = 1)
   const odooAccounts = await odooCall<OdooAnalyticalAccount[]>(config, 'object', 'execute_kw', [
     config.db,
     uid,
     config.password,
     'account.analytic.account',
     'search_read',
-    [[['active', '=', true]]],
-    { fields: ['id', 'name', 'code'] }
+    [
+      [
+        ['active', '=', true],
+        ['company_id', '=', 1]
+      ]
+    ],
+    { fields: ['id', 'name', 'code', 'plan_id'] }
   ])
+  console.log('Odoo Accounts (first 2):', odooAccounts.slice(0, 2))
+
+  // 2. Extraire les IDs de plans uniques de ces comptes
+  const planIds = [
+    ...new Set(
+      odooAccounts
+        .map((a) => (a.plan_id ? a.plan_id[0] : null))
+        .filter((id): id is number => id !== null)
+    )
+  ]
+
+  // 3. Récupérer les PROJETS (plans analytiques) correspondants
+  let odooProjects: OdooProject[] = []
+  if (planIds.length > 0) {
+    odooProjects = await odooCall<OdooProject[]>(config, 'object', 'execute_kw', [
+      config.db,
+      uid,
+      config.password,
+      'account.analytic.plan',
+      'search_read',
+      [[['id', 'in', planIds]]],
+      { fields: ['id', 'name'] }
+    ])
+  }
+  console.log('Odoo Plans/Projects (first 2):', odooProjects.slice(0, 2))
+
+  // Extraire les sigles pour le matching de secours
+  // Note: Dans les logs, on voit "SIEGE", "AGENCE", "HYDRO 1000" et des suffixes "_HYD", "_PAD2"
+  // On va créer un mapping manuel ou basé sur les patterns observés
+  const suffixToProjectMap = new Map<string, number>()
+  for (const p of odooProjects) {
+    const name = p.name.toUpperCase()
+
+    // 1. Extraire les codes entre parenthèses ou crochets (ex: "PROJET X [TIK]")
+    const match = name.match(/\[(.*?)\]|\((.*?)\)/)
+    if (match) {
+      const code = (match[1] || match[2]).trim()
+      if (code && code.length >= 2) suffixToProjectMap.set(code, p.id)
+    }
+
+    // 2. Extraire la première partie si c'est un code court (ex: "HYD - Projet")
+    const parts = name.split(/[\s-]+/)
+    for (const part of parts) {
+      if (
+        part.length >= 2 &&
+        part.length <= 6 &&
+        !['AND', 'THE', 'FOR', 'DE', 'LA', 'LE'].includes(part)
+      ) {
+        suffixToProjectMap.set(part, p.id)
+      }
+    }
+
+    // 3. Mappages manuels spécifiques connus
+    if (name.includes('HYDRO 1000')) suffixToProjectMap.set('HYD', p.id)
+    if (name.includes('SIEGE')) {
+      suffixToProjectMap.set('SIEGE', p.id)
+      suffixToProjectMap.set('SIG', p.id)
+    }
+    if (name.includes('AGENCE')) suffixToProjectMap.set('AGENCE', p.id)
+  }
+
+  console.log('Project Acronym Map:', Object.fromEntries(suffixToProjectMap))
 
   let projectsSynced = 0
   let accountsSynced = 0
 
   // 3. Synchroniser les projets dans Supabase
   for (const op of odooProjects) {
-    const { data: existing } = await supabase
-      .from('projects')
-      .select('id')
-      .eq('odoo_id', op.id)
-      .maybeSingle()
-
     const projectData = {
       name: op.name,
       code: `ODOO_${op.id}`,
@@ -114,18 +172,21 @@ export const syncOdooData = async (
       active: true
     }
 
-    if (existing) {
-      await supabase.from('projects').update(projectData).eq('id', existing.id)
-    } else {
-      await supabase.from('projects').insert(projectData)
-    }
+    await supabase.from('projects').upsert(projectData, { onConflict: 'odoo_id' })
     projectsSynced++
   }
+
+  // Désactiver les projets locaux qui ne sont plus dans Odoo (uniquement ceux qui ont un odoo_id)
+  const odooProjectIds = odooProjects.map((p) => p.id)
+  await supabase
+    .from('projects')
+    .update({ active: false })
+    .not('odoo_id', 'is', null)
+    .not('odoo_id', 'in', `(${odooProjectIds.join(',')})`)
 
   // 4. Synchroniser les comptes analytiques
   const { data: localProjects } = await supabase.from('projects').select('id, odoo_id, name')
   const projectOdooMap = new Map((localProjects || []).map((p) => [p.odoo_id, p.id]))
-  const projectNameMap = new Map((localProjects || []).map((p) => [p.name.toLowerCase().trim(), p.id]))
 
   for (const oa of odooAccounts) {
     const accountName = oa.name.trim()
@@ -134,25 +195,34 @@ export const syncOdooData = async (
     // Déterminer le projet Odoo associé
     let linkedProjectId: number | undefined
 
-    // Stratégie 1: Lien technique
-    const opTechnical = odooProjects.find(p => p.analytic_account_id && p.analytic_account_id[0] === oa.id)
-    if (opTechnical) linkedProjectId = opTechnical.id
-
-    // Stratégie 2: Suffixe (ex: "Account Name_HYD")
-    if (!linkedProjectId && accountName.includes('_')) {
-      const parts = accountName.split('_')
-      const suffix = parts[parts.length - 1].toUpperCase()
-      linkedProjectId = suffixToProjectMap.get(suffix)
+    // Stratégie 1: Lien par plan_id (Recommandé par l'utilisateur)
+    if (oa.plan_id && oa.plan_id[0]) {
+      linkedProjectId = oa.plan_id[0]
     }
 
-    // Stratégie 3: Suffixe TIK, GAB, IRAH, BDS, SIG, PAD, AG, ATM, SG, SAN, MED, GPM...
+    // Stratégie 2: Recherche de sigles/codes partout dans le nom (Fallback)
     if (!linkedProjectId) {
-      // On teste si l'un de nos noms de projet est contenu ou contient le nom du compte
-      const opByMatch = odooProjects.find(p => {
+      const parts = accountName.split(/[_\s.-]/)
+      for (const part of parts) {
+        const seg = part.toUpperCase().trim()
+        if (seg.length < 2) continue
+        const pid = suffixToProjectMap.get(seg)
+        if (pid) {
+          linkedProjectId = pid
+          break
+        }
+      }
+    }
+
+    // Stratégie 3: Suffixe TIK, GAB, IRAH, BDS, SIG, PAD, AG, ATM, SG... (Fallback)
+    if (!linkedProjectId) {
+      const opByMatch = odooProjects.find((p) => {
         const pNameNorm = p.name.toLowerCase().trim()
-        return pNameNorm === accountNameNorm || 
-               accountNameNorm.includes(pNameNorm) || 
-               pNameNorm.includes(accountNameNorm)
+        return (
+          pNameNorm === accountNameNorm ||
+          accountNameNorm.includes(pNameNorm) ||
+          pNameNorm.includes(accountNameNorm)
+        )
       })
       if (opByMatch) linkedProjectId = opByMatch.id
     }
@@ -162,27 +232,93 @@ export const syncOdooData = async (
     const localProjectId = projectOdooMap.get(linkedProjectId)
     if (!localProjectId) continue
 
-    const { data: existingAcc } = await supabase
+    // Check for existing account by odoo_id or by (project_id, code)
+    const { data: existingByOdoo } = await supabase
       .from('analytical_accounts')
-      .select('id')
+      .select('id, odoo_id, project_id, code')
       .eq('odoo_id', oa.id)
-      .eq('project_id', localProjectId)
       .maybeSingle()
 
-    const accountData = {
-      name: oa.name,
-      code: oa.code || `ODOO_${oa.id}`,
-      project_id: localProjectId,
-      odoo_id: oa.id
-    }
+    const accountCode = oa.code || `ODOO_${oa.id}`
 
-    if (existingAcc) {
-      await supabase.from('analytical_accounts').update(accountData).eq('id', existingAcc.id)
+    if (existingByOdoo) {
+      await supabase
+        .from('analytical_accounts')
+        .update({
+          name: oa.name,
+          code: accountCode,
+          project_id: localProjectId
+        })
+        .eq('id', existingByOdoo.id)
     } else {
-      await supabase.from('analytical_accounts').insert(accountData)
+      // Check if another account already uses this (project_id, code)
+      const { data: existingByCode } = await supabase
+        .from('analytical_accounts')
+        .select('id, odoo_id')
+        .eq('project_id', localProjectId)
+        .eq('code', accountCode)
+        .maybeSingle()
+
+      if (existingByCode) {
+        // If it exists but doesn't have an odoo_id, we "claim" it
+        if (!existingByCode.odoo_id) {
+          await supabase
+            .from('analytical_accounts')
+            .update({
+              name: oa.name,
+              odoo_id: oa.id
+            })
+            .eq('id', existingByCode.id)
+        } else {
+          // Conflict: different odoo_id has same code. 
+          // We must ensure the code is unique to avoid 409.
+          const uniqueCode = `${accountCode}_${oa.id}`
+          await supabase.from('analytical_accounts').insert({
+            name: oa.name,
+            code: uniqueCode,
+            project_id: localProjectId,
+            odoo_id: oa.id
+          })
+        }
+      } else {
+        // Standard insert
+        await supabase.from('analytical_accounts').insert({
+          name: oa.name,
+          code: accountCode,
+          project_id: localProjectId,
+          odoo_id: oa.id
+        })
+      }
     }
     accountsSynced++
   }
 
-  return { projects: projectsSynced, accounts: accountsSynced }
+  // 5. Synchroniser les fournisseurs
+  const odooSuppliers = await fetchOdooSuppliers(config, uid)
+  let suppliersSynced = 0
+
+  for (const os of odooSuppliers) {
+    const supplierData = {
+      name: os.name,
+      odoo_id: os.id,
+      active: true
+    }
+    await supabase.from('suppliers').upsert(supplierData, { onConflict: 'odoo_id' })
+    suppliersSynced++
+  }
+
+  // Désactiver les fournisseurs locaux qui ne sont plus dans le filtre Odoo
+  const odooSupplierIds = odooSuppliers.map((s) => s.id)
+  if (odooSupplierIds.length > 0) {
+    await supabase
+      .from('suppliers')
+      .update({ active: false })
+      .not('odoo_id', 'is', null)
+      .not('odoo_id', 'in', `(${odooSupplierIds.join(',')})`)
+  } else {
+    // Si aucun fournisseur n'est renvoyé par Odoo, on désactive tous ceux qui sont liés à Odoo
+    await supabase.from('suppliers').update({ active: false }).not('odoo_id', 'is', null)
+  }
+
+  return { projects: projectsSynced, accounts: accountsSynced, suppliers: suppliersSynced }
 }

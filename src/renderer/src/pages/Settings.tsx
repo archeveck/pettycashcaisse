@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { Loader2, Save, Plus, Edit2, Trash2, Settings as SettingsIcon } from 'lucide-react'
 import {
@@ -15,14 +15,18 @@ import {
   getUsers,
   updateUserRole,
   getOdooConfig,
+  getSuppliers,
+  updateSupplier,
+  deleteSupplier,
   type Project,
   type AnalyticalAccount,
-  type UserProfile
+  type UserProfile,
+  type Supplier
 } from '../services/settingsService'
 import { syncOdooData } from '../services/odooService'
 import { getErrorMessage } from '../utils/errorUtils'
 
-type TabType = 'app' | 'projects' | 'accounts' | 'users' | 'odoo'
+type TabType = 'app' | 'projects' | 'accounts' | 'suppliers' | 'users' | 'odoo'
 
 export default function Settings(): React.ReactElement {
   const { profile } = useAuth()
@@ -47,6 +51,11 @@ export default function Settings(): React.ReactElement {
   // Users
   const [users, setUsers] = useState<UserProfile[]>([])
 
+  // Suppliers
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false)
+  const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null)
+
   // Odoo Settings
   const [odooUrl, setOdooUrl] = useState('')
   const [odooDb, setOdooDb] = useState('')
@@ -55,11 +64,8 @@ export default function Settings(): React.ReactElement {
   const [isSavingOdoo, setIsSavingOdoo] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
 
-  useEffect(() => {
-    loadData()
-  }, [activeTab])
 
-  const loadData = async (): Promise<void> => {
+  const loadData = useCallback(async (): Promise<void> => {
     setIsLoading(true)
     try {
       if (activeTab === 'app') {
@@ -81,6 +87,9 @@ export default function Settings(): React.ReactElement {
         setOdooDb(config.db)
         setOdooUser(config.username)
         setOdooPass(config.password || '')
+      } else if (activeTab === 'suppliers') {
+        const data = await getSuppliers()
+        setSuppliers(data)
       }
     } catch (err) {
       console.error('Error loading data:', err)
@@ -88,7 +97,11 @@ export default function Settings(): React.ReactElement {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [activeTab])
+
+  useEffect(() => {
+    loadData()
+  }, [activeTab, loadData])
 
   const handleSaveAppSettings = async (): Promise<void> => {
     setIsSavingSettings(true)
@@ -134,6 +147,16 @@ export default function Settings(): React.ReactElement {
     }
   }
 
+  const handleDeleteSupplier = async (id: string): Promise<void> => {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer ce fournisseur ?')) return
+    try {
+      await deleteSupplier(id)
+      setSuppliers((prev) => prev.filter((s) => s.id !== id))
+    } catch (err: unknown) {
+      alert('Échec de la suppression du fournisseur : ' + getErrorMessage(err))
+    }
+  }
+
   const handleSaveOdooConfig = async (): Promise<void> => {
     setIsSavingOdoo(true)
     try {
@@ -163,7 +186,7 @@ export default function Settings(): React.ReactElement {
         username: odooUser,
         password: odooPass
       })
-      alert(`Synchronisation terminée : ${result.projects} projets et ${result.accounts} comptes synchronisés.`)
+      alert(`Synchronisation terminée : ${result.projects} projets, ${result.accounts} comptes et ${result.suppliers} fournisseurs synchronisés.`)
     } catch (err) {
       alert(`Erreur de synchronisation : ${getErrorMessage(err)}`)
     } finally {
@@ -176,6 +199,7 @@ export default function Settings(): React.ReactElement {
     { id: 'odoo' as TabType, label: 'ERP Odoo', icon: SettingsIcon },
     { id: 'projects' as TabType, label: 'Projets', icon: SettingsIcon },
     { id: 'accounts' as TabType, label: 'Comptes Analytiques', icon: SettingsIcon },
+    { id: 'suppliers' as TabType, label: 'Fournisseurs', icon: SettingsIcon },
     { id: 'users' as TabType, label: 'Utilisateurs', icon: SettingsIcon }
   ]
 
@@ -378,6 +402,61 @@ export default function Settings(): React.ReactElement {
           {/* Accounts Tab Content End */}
           {activeTab === 'accounts' && <div></div>}
 
+          {/* Suppliers Tab */}
+          {activeTab === 'suppliers' && (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h2 className="text-xl font-semibold">Fournisseurs</h2>
+              </div>
+
+              <div className="grid gap-4">
+                {suppliers.length === 0 ? (
+                  <div className="p-8 text-center bg-card rounded-lg border border-dashed border-border text-muted-foreground">
+                    Aucun fournisseur trouvé. Synchronisez avec Odoo pour les importer.
+                  </div>
+                ) : (
+                  suppliers.map((supplier) => (
+                    <div
+                      key={supplier.id}
+                      className="p-4 bg-card rounded-lg border border-border shadow-sm flex justify-between items-start"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold">{supplier.name}</h3>
+                          <span className="text-xs bg-secondary px-2 py-1 rounded">
+                            ID Odoo: {supplier.odoo_id || 'N/A'}
+                          </span>
+                          {!supplier.active && (
+                            <span className="text-xs bg-destructive/20 text-destructive px-2 py-1 rounded">
+                              Inactif
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setEditingSupplier(supplier)
+                            setIsSupplierModalOpen(true)
+                          }}
+                          className="p-2 hover:bg-secondary rounded-md transition-colors"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteSupplier(supplier.id)}
+                          className="p-2 hover:bg-destructive/20 text-destructive rounded-md transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Odoo ERP Tab */}
           {activeTab === 'odoo' && (
             <div className="max-w-2xl space-y-6">
@@ -530,6 +609,18 @@ export default function Settings(): React.ReactElement {
           onClose={() => setIsAccountModalOpen(false)}
           onSave={() => {
             setIsAccountModalOpen(false)
+            loadData()
+          }}
+        />
+      )}
+
+      {/* Supplier Modal */}
+      {isSupplierModalOpen && (
+        <SupplierModal
+          supplier={editingSupplier}
+          onClose={() => setIsSupplierModalOpen(false)}
+          onSave={() => {
+            setIsSupplierModalOpen(false)
             loadData()
           }}
         />
@@ -726,6 +817,89 @@ function AccountModal({
               required
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             />
+          </div>
+
+          <div className="flex gap-2 justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border border-border rounded-md hover:bg-secondary transition-colors"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              {isSaving ? 'Enregistrement...' : 'Enregistrer'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// Supplier Modal Component
+function SupplierModal({
+  supplier,
+  onClose,
+  onSave
+}: {
+  supplier: Supplier | null
+  onClose: () => void
+  onSave: () => void
+}): React.ReactElement {
+  const [name, setName] = useState(supplier?.name || '')
+  const [active, setActive] = useState(supplier?.active ?? true)
+  const [isSaving, setIsSaving] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent): Promise<void> => {
+    e.preventDefault()
+    setIsSaving(true)
+
+    try {
+      if (supplier) {
+        await updateSupplier(supplier.id, { name, active })
+      }
+      onSave()
+    } catch (err: unknown) {
+      alert("Échec de l'enregistrement du fournisseur : " + getErrorMessage(err))
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-card p-6 rounded-lg border border-border shadow-lg max-w-md w-full">
+        <h2 className="text-xl font-semibold mb-4">
+          {supplier ? 'Modifier le Fournisseur' : 'Nouveau Fournisseur'}
+        </h2>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Nom</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="supplier-active"
+              checked={active}
+              onChange={(e) => setActive(e.target.checked)}
+              className="w-4 h-4"
+            />
+            <label htmlFor="supplier-active" className="text-sm font-medium">
+              Actif
+            </label>
           </div>
 
           <div className="flex gap-2 justify-end">

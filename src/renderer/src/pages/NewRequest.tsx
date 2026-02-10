@@ -6,9 +6,15 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useAuth } from '../hooks/useAuth'
 import { useNotification } from '../contexts/NotificationContext'
 import { supabase } from '../services/supabase'
-import { getAppSettings } from '../services/settingsService'
+import {
+  getAppSettings,
+  getSuppliers,
+  getProjects,
+  type Supplier,
+  type Project
+} from '../services/settingsService'
 import { getErrorMessage } from '../utils/errorUtils'
-import { Loader2, Send, ArrowLeft, AlertCircle } from 'lucide-react'
+import { Loader2, Send, ArrowLeft, AlertCircle, Briefcase } from 'lucide-react'
 
 // Schema factory for the request form (dynamic based on max limit)
 const createRequestSchema = (
@@ -17,6 +23,8 @@ const createRequestSchema = (
   amount: z.ZodNumber
   description: z.ZodString
   analytical_account_id: z.ZodString
+  project_id: z.ZodString
+  supplier_id: z.ZodUnion<[z.ZodOptional<z.ZodString>, z.ZodLiteral<''>]>
 }> =>
   z.object({
     amount: z
@@ -24,13 +32,16 @@ const createRequestSchema = (
       .min(1, 'Le montant doit être supérieur à 0')
       .max(maxLimit, `Le montant ne peut pas dépasser ${maxLimit.toLocaleString('fr-FR')} FCFA`),
     description: z.string().min(5, 'La description doit contenir au moins 5 caractères'),
-    analytical_account_id: z.string().uuid('Veuillez sélectionner un compte analytique')
+    project_id: z.string().uuid('Veuillez sélectionner un projet'),
+    analytical_account_id: z.string().uuid('Veuillez sélectionner un compte analytique'),
+    supplier_id: z.string().uuid('Veuillez sélectionner un fournisseur').optional().or(z.literal(''))
   })
 
 type RequestFormValues = z.infer<ReturnType<typeof createRequestSchema>>
 
 interface AnalyticalAccount {
   id: string
+  project_id: string
   name: string
   code: string
   project: {
@@ -42,6 +53,7 @@ interface AnalyticalAccount {
 // Type for Supabase response (project is returned as an array)
 interface SupabaseAnalyticalAccount {
   id: string
+  project_id: string
   name: string
   code: string
   project: {
@@ -55,7 +67,9 @@ export default function NewRequest(): React.ReactElement {
   const { showNotification } = useNotification()
   const navigate = useNavigate()
   const [isLoading, setIsLoading] = useState(false)
+  const [projects, setProjects] = useState<Project[]>([])
   const [accounts, setAccounts] = useState<AnalyticalAccount[]>([])
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [fetchError] = useState<string | null>(null)
   const [maxOutflowLimit, setMaxOutflowLimit] = useState<number>(0)
   const [isLoadingSettings, setIsLoadingSettings] = useState(true)
@@ -63,10 +77,22 @@ export default function NewRequest(): React.ReactElement {
   const {
     register,
     handleSubmit,
+    watch,
+    setValue,
     formState: { errors }
   } = useForm<RequestFormValues>({
     resolver: zodResolver(createRequestSchema(maxOutflowLimit || 999999999))
   })
+
+  const selectedProjectId = watch('project_id')
+
+  // Filter accounts based on selected project
+  const filteredAccounts = accounts.filter((acc) => acc.project_id === selectedProjectId)
+
+  // Reset analytical account when project changes
+  useEffect(() => {
+    setValue('analytical_account_id', '')
+  }, [selectedProjectId, setValue])
 
   // Fetch app settings and analytical accounts on mount
   useEffect(() => {
@@ -83,6 +109,7 @@ export default function NewRequest(): React.ReactElement {
           .select(
             `
             id,
+            project_id,
             name,
             code,
             project:projects (
@@ -100,6 +127,7 @@ export default function NewRequest(): React.ReactElement {
         const transformedData: AnalyticalAccount[] = (data || []).map(
           (account: SupabaseAnalyticalAccount) => ({
             id: account.id,
+            project_id: account.project_id,
             name: account.name,
             code: account.code,
             project: account.project?.[0] || { name: '', code: '' }
@@ -107,6 +135,23 @@ export default function NewRequest(): React.ReactElement {
         )
 
         setAccounts(transformedData)
+
+        // Fetch projects
+        const projectData = await getProjects()
+        setProjects(projectData.filter((p) => p.active))
+
+        // Fetch suppliers
+        try {
+          const supplierData = await getSuppliers()
+          setSuppliers(supplierData)
+        } catch (supErr: unknown) {
+          const error = supErr as { code?: string; status?: number }
+          if (error.code === 'PGRST116' || error.status === 404) {
+            console.warn('La table "suppliers" semble manquante dans Supabase. Veuillez la créer.')
+          } else {
+            throw supErr
+          }
+        }
       } catch (err: unknown) {
         console.error('Error fetching data:', err)
         showNotification(`Erreur lors du chargement des données: ${getErrorMessage(err)}`, 'error')
@@ -115,7 +160,7 @@ export default function NewRequest(): React.ReactElement {
     }
 
     fetchData()
-  }, [])
+  }, [showNotification])
 
   const onSubmit = async (data: RequestFormValues): Promise<void> => {
     if (!user) return
@@ -127,6 +172,7 @@ export default function NewRequest(): React.ReactElement {
         amount: data.amount,
         description: data.description,
         analytical_account_id: data.analytical_account_id,
+        supplier_id: data.supplier_id || null,
         status: 'pending_controller'
       })
 
@@ -210,6 +256,35 @@ export default function NewRequest(): React.ReactElement {
             )}
           </div>
 
+          {/* Project Selection Field */}
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-foreground" htmlFor="project">
+              Projet <span className="text-destructive">*</span>
+            </label>
+            <div className="relative">
+              <select
+                id="project"
+                className="flex h-12 w-full rounded-xl border border-input bg-background/50 backdrop-blur-sm px-4 py-3 text-sm ring-offset-background transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:border-primary disabled:cursor-not-allowed disabled:opacity-50 hover:border-primary/50 appearance-none"
+                {...register('project_id')}
+              >
+                <option value="">Sélectionner un projet...</option>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name} {project.code ? `(${project.code})` : ''}
+                  </option>
+                ))}
+              </select>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
+                <Briefcase className="w-4 h-4" />
+              </div>
+            </div>
+            {errors.project_id && (
+              <p className="text-sm text-destructive animate-in fade-in slide-in-from-top-1 duration-200">
+                {errors.project_id.message}
+              </p>
+            )}
+          </div>
+
           {/* Analytical Account Field */}
           <div className="space-y-2">
             <label className="text-sm font-semibold text-foreground" htmlFor="account">
@@ -217,19 +292,48 @@ export default function NewRequest(): React.ReactElement {
             </label>
             <select
               id="account"
+              disabled={!selectedProjectId}
               className="flex h-12 w-full rounded-xl border border-input bg-background/50 backdrop-blur-sm px-4 py-3 text-sm ring-offset-background transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:border-primary disabled:cursor-not-allowed disabled:opacity-50 hover:border-primary/50"
               {...register('analytical_account_id')}
             >
-              <option value="">Sélectionner un compte...</option>
-              {accounts.map((account) => (
+              <option value="">
+                {!selectedProjectId
+                  ? "Veuillez d'abord sélectionner un projet"
+                  : 'Sélectionner un compte...'}
+              </option>
+              {filteredAccounts.map((account) => (
                 <option key={account.id} value={account.id}>
-                  {account.code} - {account.name} ({account.project.name})
+                  {account.code} - {account.name}
                 </option>
               ))}
             </select>
             {errors.analytical_account_id && (
               <p className="text-sm text-destructive animate-in fade-in slide-in-from-top-1 duration-200">
                 {errors.analytical_account_id.message}
+              </p>
+            )}
+          </div>
+
+          {/* Supplier Field */}
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-foreground" htmlFor="supplier">
+              Fournisseur
+            </label>
+            <select
+              id="supplier"
+              className="flex h-12 w-full rounded-xl border border-input bg-background/50 backdrop-blur-sm px-4 py-3 text-sm ring-offset-background transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:border-primary disabled:cursor-not-allowed disabled:opacity-50 hover:border-primary/50"
+              {...register('supplier_id')}
+            >
+              <option value="">Sélectionner un fournisseur (optionnel)...</option>
+              {suppliers.map((supplier) => (
+                <option key={supplier.id} value={supplier.id}>
+                  {supplier.name}
+                </option>
+              ))}
+            </select>
+            {errors.supplier_id && (
+              <p className="text-sm text-destructive animate-in fade-in slide-in-from-top-1 duration-200">
+                {errors.supplier_id.message}
               </p>
             )}
           </div>

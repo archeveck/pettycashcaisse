@@ -70,115 +70,138 @@ function VoucherContent({ data }: { data: VoucherData }): React.ReactElement {
     const amountInWords = numberToFrenchWords(data.amount)
 
     return (
-        <div className="voucher-content font-sans text-black">
+        <>
             <style>
                 {`
           @media print {
+            /* Hide everything by default */
+            body * {
+              visibility: hidden;
+            }
+            
+            /* Show only the voucher content and its parents */
+            .voucher-print-container,
+            .voucher-print-container * {
+              visibility: visible;
+            }
+            
+            /* Reset positioning for print */
+            .voucher-print-container {
+              position: absolute;
+              left: 0;
+              top: 0;
+              width: 100%;
+              margin: 0;
+              padding: 0;
+              background: white !important;
+            }
+
             @page {
               size: A4;
-              margin: 1cm;
+              margin: 1.5cm;
             }
+            
             body {
-              print-color-adjust: exact;
+              background: white !important;
               -webkit-print-color-adjust: exact;
-            }
-            .voucher-content {
-              width: 100%;
-              max-width: 100%;
+              print-color-adjust: exact;
             }
           }
         `}
             </style>
 
-            {/* Header */}
-            <div className="text-center mb-8 pb-4 border-b-2 border-black">
-                <h1 className="text-2xl font-bold mb-2">PIÈCE DE CAISSE</h1>
-                <p className="text-sm text-gray-600">ESTIA SYNERGIE</p>
-            </div>
+            <div className="voucher-print-container font-sans text-black">
 
-            {/* Voucher Info */}
-            <div className="grid grid-cols-2 gap-4 mb-6">
-                <div>
-                    <p className="text-sm text-gray-600">N° de Pièce</p>
-                    <p className="font-mono font-bold">{data.transactionId.substring(0, 8).toUpperCase()}</p>
-                </div>
-                <div className="text-right">
-                    <p className="text-sm text-gray-600">Date</p>
-                    <p className="font-bold">
-                        {format(new Date(data.date), 'dd MMMM yyyy à HH:mm', { locale: fr })}
-                    </p>
-                </div>
-            </div>
-
-            {/* Main Content */}
-            <div className="border-2 border-black p-6 mb-6">
-                <div className="mb-4">
-                    <p className="text-sm text-gray-600 mb-1">Bénéficiaire</p>
-                    <p className="font-bold text-lg">{data.requesterName}</p>
+                {/* Header */}
+                <div className="text-center mb-8 pb-4 border-b-2 border-black">
+                    <h1 className="text-2xl font-bold mb-2">PIÈCE DE CAISSE</h1>
+                    <p className="text-sm text-gray-600">ESTIA SYNERGIE</p>
                 </div>
 
-                <div className="mb-4">
-                    <p className="text-sm text-gray-600 mb-1">Montant (chiffres)</p>
-                    <p className="font-bold text-2xl">
-                        {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XOF' }).format(
-                            data.amount
-                        )}
-                    </p>
-                </div>
-
-                <div className="mb-4">
-                    <p className="text-sm text-gray-600 mb-1">Montant (lettres)</p>
-                    <p className="font-medium capitalize border-b border-gray-400 pb-1">
-                        {amountInWords} francs CFA
-                    </p>
-                </div>
-
-                <div className="mb-4">
-                    <p className="text-sm text-gray-600 mb-1">Objet / Description</p>
-                    <p className="font-medium">{data.description}</p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
+                {/* Voucher Info */}
+                <div className="grid grid-cols-2 gap-4 mb-6">
                     <div>
-                        <p className="text-sm text-gray-600 mb-1">Compte Analytique</p>
-                        <p className="font-medium">{data.analyticalAccount.code}</p>
-                        <p className="text-sm text-gray-500">{data.analyticalAccount.name}</p>
+                        <p className="text-sm text-gray-600">N° de Pièce</p>
+                        <p className="font-mono font-bold">{data.transactionId.substring(0, 8).toUpperCase()}</p>
                     </div>
-                    <div>
-                        <p className="text-sm text-gray-600 mb-1">Projet</p>
-                        <p className="font-medium">{data.analyticalAccount.project.name}</p>
-                    </div>
-                </div>
-            </div>
-
-            {/* Signatures */}
-            <div className="grid grid-cols-3 gap-8 mt-12">
-                <div className="text-center">
-                    <div className="border-t-2 border-black pt-2 mt-16">
-                        <p className="font-bold">Bénéficiaire</p>
-                        <p className="text-sm text-gray-600">Signature</p>
-                    </div>
-                </div>
-                <div className="text-center">
-                    <div className="border-t-2 border-black pt-2 mt-16">
-                        <p className="font-bold">Caissier(ère)</p>
-                        <p className="text-sm text-gray-600">
-                            {data.cashierName || 'Signature'}
+                    <div className="text-right">
+                        <p className="text-sm text-gray-600">Date</p>
+                        <p className="font-bold">
+                            {format(new Date(data.date), 'dd MMMM yyyy à HH:mm', { locale: fr })}
                         </p>
                     </div>
                 </div>
-                <div className="text-center">
-                    <div className="border-t-2 border-black pt-2 mt-16">
-                        <p className="font-bold">Contrôleur</p>
-                        <p className="text-sm text-gray-600">Signature</p>
+
+                {/* Main Content */}
+                <div className="border-2 border-black p-6 mb-6">
+                    <div className="mb-4">
+                        <p className="text-sm text-gray-600 mb-1">Bénéficiaire</p>
+                        <p className="font-bold text-lg">{data.requesterName}</p>
+                    </div>
+
+                    <div className="mb-4">
+                        <p className="text-sm text-gray-600 mb-1">Montant (chiffres)</p>
+                        <p className="font-bold text-2xl">
+                            {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XOF' }).format(
+                                data.amount
+                            )}
+                        </p>
+                    </div>
+
+                    <div className="mb-4">
+                        <p className="text-sm text-gray-600 mb-1">Montant (lettres)</p>
+                        <p className="font-medium capitalize border-b border-gray-400 pb-1">
+                            {amountInWords} francs CFA
+                        </p>
+                    </div>
+
+                    <div className="mb-4">
+                        <p className="text-sm text-gray-600 mb-1">Objet / Description</p>
+                        <p className="font-medium">{data.description}</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <p className="text-sm text-gray-600 mb-1">Compte Analytique</p>
+                            <p className="font-medium">{data.analyticalAccount.code}</p>
+                            <p className="text-sm text-gray-500">{data.analyticalAccount.name}</p>
+                        </div>
+                        <div>
+                            <p className="text-sm text-gray-600 mb-1">Projet</p>
+                            <p className="font-medium">{data.analyticalAccount.project.name}</p>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            {/* Footer */}
-            <div className="mt-12 pt-4 border-t border-gray-300 text-center text-xs text-gray-500">
-                <p>Document généré le {format(new Date(), 'dd/MM/yyyy à HH:mm', { locale: fr })}</p>
+                {/* Signatures */}
+                <div className="grid grid-cols-3 gap-8 mt-12">
+                    <div className="text-center">
+                        <div className="border-t-2 border-black pt-2 mt-16">
+                            <p className="font-bold">Bénéficiaire</p>
+                            <p className="text-sm text-gray-600">Signature</p>
+                        </div>
+                    </div>
+                    <div className="text-center">
+                        <div className="border-t-2 border-black pt-2 mt-16">
+                            <p className="font-bold">Caissier(ère)</p>
+                            <p className="text-sm text-gray-600">
+                                {data.cashierName || 'Signature'}
+                            </p>
+                        </div>
+                    </div>
+                    <div className="text-center">
+                        <div className="border-t-2 border-black pt-2 mt-16">
+                            <p className="font-bold">Contrôleur</p>
+                            <p className="text-sm text-gray-600">Signature</p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Footer */}
+                <div className="mt-12 pt-4 border-t border-gray-300 text-center text-xs text-gray-500">
+                    <p>Document généré le {format(new Date(), 'dd/MM/yyyy à HH:mm', { locale: fr })}</p>
+                </div>
             </div>
-        </div>
+        </>
     )
 }

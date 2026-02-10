@@ -191,3 +191,38 @@ export const updateUserRole = async (userId: string, role: UserProfile['role']):
 
   if (error) throw error
 }
+
+// Suppliers
+export interface Supplier {
+  id: string
+  name: string
+  odoo_id?: number
+  active: boolean
+  created_at: string
+}
+
+export const getSuppliers = async (): Promise<Supplier[]> => {
+  const { data, error } = await supabase
+    .from('suppliers')
+    .select('*')
+    .eq('active', true)
+    .order('name', { ascending: true })
+
+  if (error) throw error
+  return data as Supplier[]
+}
+
+export const updateSupplier = async (
+  id: string,
+  updates: Partial<Omit<Supplier, 'id' | 'created_at'>>
+): Promise<void> => {
+  const { error } = await supabase.from('suppliers').update(updates).eq('id', id)
+
+  if (error) throw error
+}
+
+export const deleteSupplier = async (id: string): Promise<void> => {
+  const { error } = await supabase.from('suppliers').delete().eq('id', id)
+
+  if (error) throw error
+}
