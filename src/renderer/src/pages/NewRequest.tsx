@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { useNavigate } from 'react-router-dom'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -15,6 +15,7 @@ import {
 } from '../services/settingsService'
 import { getErrorMessage } from '../utils/errorUtils'
 import { Loader2, Send, ArrowLeft, AlertCircle, Briefcase } from 'lucide-react'
+import { SearchableSelect } from '../components/SearchableSelect'
 
 // Schema factory for the request form (dynamic based on max limit)
 const createRequestSchema = (
@@ -34,7 +35,11 @@ const createRequestSchema = (
     description: z.string().min(5, 'La description doit contenir au moins 5 caractères'),
     project_id: z.string().uuid('Veuillez sélectionner un projet'),
     analytical_account_id: z.string().uuid('Veuillez sélectionner un compte analytique'),
-    supplier_id: z.string().uuid('Veuillez sélectionner un fournisseur').optional().or(z.literal(''))
+    supplier_id: z
+      .string()
+      .uuid('Veuillez sélectionner un fournisseur')
+      .optional()
+      .or(z.literal(''))
   })
 
 type RequestFormValues = z.infer<ReturnType<typeof createRequestSchema>>
@@ -79,6 +84,7 @@ export default function NewRequest(): React.ReactElement {
     handleSubmit,
     watch,
     setValue,
+    control,
     formState: { errors }
   } = useForm<RequestFormValues>({
     resolver: zodResolver(createRequestSchema(maxOutflowLimit || 999999999))
@@ -290,23 +296,25 @@ export default function NewRequest(): React.ReactElement {
             <label className="text-sm font-semibold text-foreground" htmlFor="account">
               Compte Analytique <span className="text-destructive">*</span>
             </label>
-            <select
-              id="account"
-              disabled={!selectedProjectId}
-              className="flex h-12 w-full rounded-xl border border-input bg-background/50 backdrop-blur-sm px-4 py-3 text-sm ring-offset-background transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:border-primary disabled:cursor-not-allowed disabled:opacity-50 hover:border-primary/50"
-              {...register('analytical_account_id')}
-            >
-              <option value="">
-                {!selectedProjectId
-                  ? "Veuillez d'abord sélectionner un projet"
-                  : 'Sélectionner un compte...'}
-              </option>
-              {filteredAccounts.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.code} - {account.name}
-                </option>
-              ))}
-            </select>
+            <Controller
+              name="analytical_account_id"
+              control={control}
+              render={({ field }) => (
+                <SearchableSelect
+                  options={filteredAccounts}
+                  value={field.value || ''}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  disabled={!selectedProjectId}
+                  placeholder={
+                    !selectedProjectId
+                      ? "Veuillez d'abord sélectionner un projet"
+                      : 'Sélectionner un compte...'
+                  }
+                  error={errors.analytical_account_id?.message}
+                />
+              )}
+            />
             {errors.analytical_account_id && (
               <p className="text-sm text-destructive animate-in fade-in slide-in-from-top-1 duration-200">
                 {errors.analytical_account_id.message}
@@ -319,18 +327,20 @@ export default function NewRequest(): React.ReactElement {
             <label className="text-sm font-semibold text-foreground" htmlFor="supplier">
               Fournisseur
             </label>
-            <select
-              id="supplier"
-              className="flex h-12 w-full rounded-xl border border-input bg-background/50 backdrop-blur-sm px-4 py-3 text-sm ring-offset-background transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:border-primary disabled:cursor-not-allowed disabled:opacity-50 hover:border-primary/50"
-              {...register('supplier_id')}
-            >
-              <option value="">Sélectionner un fournisseur (optionnel)...</option>
-              {suppliers.map((supplier) => (
-                <option key={supplier.id} value={supplier.id}>
-                  {supplier.name}
-                </option>
-              ))}
-            </select>
+            <Controller
+              name="supplier_id"
+              control={control}
+              render={({ field }) => (
+                <SearchableSelect
+                  options={suppliers}
+                  value={field.value || ''}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  placeholder="Sélectionner un fournisseur (optionnel)..."
+                  error={errors.supplier_id?.message}
+                />
+              )}
+            />
             {errors.supplier_id && (
               <p className="text-sm text-destructive animate-in fade-in slide-in-from-top-1 duration-200">
                 {errors.supplier_id.message}
