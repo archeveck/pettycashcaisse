@@ -44,7 +44,7 @@ export default function Dashboard(): React.ReactElement {
   const [isLoading, setIsLoading] = useState(true)
 
   const showProofAlerts =
-    profile?.role && ['admin', 'controller', 'cashier'].includes(profile.role)
+    profile?.role && ['admin', 'controller', 'cashier', 'cfo'].includes(profile.role)
 
   useEffect(() => {
     const fetchStats = async (): Promise<void> => {
@@ -295,6 +295,7 @@ export default function Dashboard(): React.ReactElement {
     if (
       profile?.role === 'cashier' ||
       profile?.role === 'controller' ||
+      profile?.role === 'cfo' ||
       profile?.role === 'requester'
     ) {
       actions.push({
@@ -345,6 +346,7 @@ export default function Dashboard(): React.ReactElement {
           {/* Current Balance - for cashier, admin, controller, cfo */}
           {(profile?.role === 'cashier' ||
             profile?.role === 'admin' ||
+            profile?.role === 'cfo' ||
             profile?.role === 'controller') && (
               <div className="group p-6 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
@@ -365,8 +367,8 @@ export default function Dashboard(): React.ReactElement {
               </div>
             )}
 
-          {/* Pending Validations - for controller, cfo */}
-          {(profile?.role === 'controller') && (
+          {/* Pending Validations - for controller */}
+          {profile?.role === 'controller' && (
             <div
               onClick={() => navigate('/validations')}
               className="group p-6 bg-gradient-to-br from-green-600 to-emerald-600 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 relative overflow-hidden cursor-pointer"

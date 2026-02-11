@@ -39,7 +39,7 @@ function App(): React.ReactElement {
                   <Route path="/requests/new" element={<NewRequest />} />
                   <Route path="/requests" element={<MyRequests />} />
 
-                  <Route element={<ProtectedRoute allowedRoles={['controller']} />}>
+                  <Route element={<ProtectedRoute allowedRoles={['controller', 'cfo']} />}>
                     <Route path="/validations" element={<Validations />} />
                   </Route>
 
@@ -51,13 +51,13 @@ function App(): React.ReactElement {
 
                   <Route
                     element={
-                      <ProtectedRoute allowedRoles={['cashier', 'controller', 'requester']} />
+                      <ProtectedRoute allowedRoles={['cashier', 'controller', 'cfo', 'requester']} />
                     }
                   >
                     <Route path="/transactions" element={<Transactions />} />
                   </Route>
 
-                  <Route element={<ProtectedRoute allowedRoles={['admin', 'controller']} />}>
+                  <Route element={<ProtectedRoute allowedRoles={['admin', 'controller', 'cfo']} />}>
                     <Route path="/reports" element={<Reports />} />
                   </Route>
 

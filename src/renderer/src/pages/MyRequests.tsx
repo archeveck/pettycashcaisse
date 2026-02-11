@@ -12,6 +12,9 @@ interface CashRequest {
   description: string
   status: string
   created_at: string
+  requester: {
+    full_name: string
+  }
   analytical_account: {
     code: string
     name: string
@@ -48,7 +51,7 @@ export default function MyRequests(): React.ReactElement {
       if (!user) return
 
       try {
-        const { data, error } = await supabase
+        let query = supabase
           .from('cash_requests')
           .select(
             `
@@ -57,6 +60,7 @@ export default function MyRequests(): React.ReactElement {
             description,
             status,
             created_at,
+            requester:profiles(full_name),
             analytical_account:analytical_accounts (
               code,
               name,
@@ -66,8 +70,14 @@ export default function MyRequests(): React.ReactElement {
             )
           `
           )
-          .eq('requester_id', user.id)
           .order('created_at', { ascending: false })
+
+        // Apply filter only for requesters
+        if (profile?.role === 'requester') {
+          query = query.eq('requester_id', user.id)
+        }
+
+        const { data, error } = await query
 
         if (error) throw error
         setRequests(data as unknown as CashRequest[])
@@ -108,7 +118,7 @@ export default function MyRequests(): React.ReactElement {
       setVoucherData({
         transactionId: transaction.id,
         date: transaction.date,
-        requesterName: profile?.full_name || 'N/A',
+        requesterName: request.requester?.full_name || 'N/A',
         amount: request.amount,
         description: request.description,
         analyticalAccount: request.analytical_account
@@ -121,14 +131,18 @@ export default function MyRequests(): React.ReactElement {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Mes Demandes</h1>
-        <Link
-          to="/requests/new"
-          className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-md hover:bg-primary/90 transition-colors"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Nouvelle Demande
-        </Link>
+        <h1 className="text-3xl font-bold tracking-tight">
+          {profile?.role === 'requester' ? 'Mes Demandes' : 'Toutes les Demandes'}
+        </h1>
+        {profile?.role === 'requester' && (
+          <Link
+            to="/requests/new"
+            className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-md hover:bg-primary/90 transition-colors"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Nouvelle Demande
+          </Link>
+        )}
       </div>
 
       {isLoading ? (
@@ -146,6 +160,7 @@ export default function MyRequests(): React.ReactElement {
               <thead className="text-xs text-muted-foreground uppercase bg-secondary/50 border-b border-border">
                 <tr>
                   <th className="px-6 py-3">Date</th>
+                  <th className="px-6 py-3">Demandeur</th>
                   <th className="px-6 py-3">Description</th>
                   <th className="px-6 py-3">Compte</th>
                   <th className="px-6 py-3">Montant</th>
@@ -161,6 +176,9 @@ export default function MyRequests(): React.ReactElement {
                   >
                     <td className="px-6 py-4 font-medium">
                       {format(new Date(request.created_at), 'MMM d, yyyy')}
+                    </td>
+                    <td className="px-6 py-4 font-medium text-purple-600">
+                      {request.requester?.full_name || 'N/A'}
                     </td>
                     <td className="px-6 py-4 max-w-xs truncate" title={request.description}>
                       {request.description}

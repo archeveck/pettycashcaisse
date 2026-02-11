@@ -41,16 +41,16 @@ export default function MainLayout(): React.ReactElement {
       roles: ['requester']
     },
     {
-      label: 'Mes Demandes',
+      label: profile?.role === 'requester' ? 'Mes Demandes' : 'Toutes les Demandes',
       path: '/requests',
       icon: FileText,
-      roles: ['requester']
+      roles: ['requester', 'cfo', 'admin']
     },
     {
       label: 'Validations',
       path: '/validations',
       icon: CheckSquare,
-      roles: ['controller', 'cfo']
+      roles: ['controller']
     },
     {
       label: 'Transactions',

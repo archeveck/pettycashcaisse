@@ -100,6 +100,11 @@ id,
             status: 'approved',
             controller_approval_at: new Date().toISOString()
           }
+        } else if (profile.role === 'cfo') {
+          updates = {
+            status: 'approved',
+            cfo_approval_at: new Date().toISOString()
+          }
         }
       }
 
