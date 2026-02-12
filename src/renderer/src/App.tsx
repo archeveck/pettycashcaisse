@@ -15,6 +15,7 @@ import ClosureHistory from './pages/ClosureHistory'
 import Transactions from './pages/Transactions'
 import Reports from './pages/Reports'
 import Settings from './pages/Settings'
+import AccountantDashboard from './pages/AccountantDashboard'
 import Unauthorized from './pages/Unauthorized'
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -59,6 +60,10 @@ function App(): React.ReactElement {
 
                   <Route element={<ProtectedRoute allowedRoles={['admin', 'controller', 'cfo']} />}>
                     <Route path="/reports" element={<Reports />} />
+                  </Route>
+
+                  <Route element={<ProtectedRoute allowedRoles={['admin', 'accountant']} />}>
+                    <Route path="/accounting" element={<AccountantDashboard />} />
                   </Route>
 
                   <Route element={<ProtectedRoute allowedRoles={['admin']} />}>

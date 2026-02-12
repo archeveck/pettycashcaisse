@@ -71,6 +71,12 @@ export default function MainLayout(): React.ReactElement {
       roles: ['admin', 'controller', 'cfo']
     },
     {
+      label: 'Comptabilité',
+      path: '/accounting',
+      icon: List,
+      roles: ['admin', 'accountant']
+    },
+    {
       label: 'Paramètres',
       path: '/settings',
       icon: Settings,

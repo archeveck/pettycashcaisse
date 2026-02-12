@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../hooks/useAuth'
+import { useNotification } from '../contexts/NotificationContext'
 import { Loader2, Save, Plus, Edit2, Trash2, Settings as SettingsIcon } from 'lucide-react'
 import {
   getAppSettings,
@@ -14,6 +15,8 @@ import {
   deleteAnalyticalAccount,
   getUsers,
   updateUserRole,
+  updateUserProfile,
+  adminCreateUser,
   getOdooConfig,
   getSuppliers,
   updateSupplier,
@@ -55,6 +58,8 @@ export default function Settings(): React.ReactElement {
 
   // Users
   const [users, setUsers] = useState<UserProfile[]>([])
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false)
+  const [editingUser, setEditingUser] = useState<UserProfile | null>(null)
 
   // Suppliers
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
@@ -147,16 +152,6 @@ export default function Settings(): React.ReactElement {
       setAccounts((prev) => prev.filter((a) => a.id !== id))
     } catch (err: unknown) {
       alert('Échec de la suppression du compte : ' + getErrorMessage(err))
-    }
-  }
-
-  const handleUpdateUserRole = async (userId: string, role: UserProfile['role']): Promise<void> => {
-    try {
-      await updateUserRole(userId, role)
-      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role } : u)))
-      alert('Rôle utilisateur mis à jour avec succès')
-    } catch (err: unknown) {
-      alert('Échec de la mise à jour du rôle : ' + getErrorMessage(err))
     }
   }
 
@@ -641,7 +636,19 @@ export default function Settings(): React.ReactElement {
           {/* Users Tab */}
           {activeTab === 'users' && (
             <div className="space-y-4">
-              <h2 className="text-xl font-semibold">Gestion des Utilisateurs</h2>
+              <div className="flex justify-between items-center">
+                <h2 className="text-xl font-semibold">Gestion des Utilisateurs</h2>
+                <button
+                  onClick={() => {
+                    setEditingUser(null)
+                    setIsUserModalOpen(true)
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  Nouveau Profil
+                </button>
+              </div>
 
               <div className="grid gap-4">
                 {users.map((user) => (
@@ -652,22 +659,19 @@ export default function Settings(): React.ReactElement {
                     <div>
                       <h3 className="font-semibold">{user.full_name || 'Sans Nom'}</h3>
                       <p className="text-sm text-muted-foreground">{user.id}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Rôle: {user.role}</p>
                     </div>
                     <div className="flex items-center gap-4">
-                      <select
-                        value={user.role}
-                        onChange={(e) =>
-                          handleUpdateUserRole(user.id, e.target.value as UserProfile['role'])
-                        }
-                        disabled={user.id === profile?.id}
-                        className="px-3 py-2 border border-input rounded-md bg-background text-sm disabled:opacity-50"
+                      <button
+                        onClick={() => {
+                          setEditingUser(user)
+                          setIsUserModalOpen(true)
+                        }}
+                        className="p-2 text-muted-foreground hover:text-primary transition-colors"
+                        title="Modifier"
                       >
-                        <option value="requester">Demandeur</option>
-                        <option value="cashier">Caissier</option>
-                        <option value="controller">Contrôleur</option>
-                        <option value="cfo">DAF</option>
-                        <option value="admin">Administrateur</option>
-                      </select>
+                        <Edit2 className="w-4 h-4" />
+                      </button>
                       {user.id === profile?.id && (
                         <span className="text-xs text-muted-foreground">(Vous)</span>
                       )}
@@ -728,6 +732,147 @@ export default function Settings(): React.ReactElement {
           }}
         />
       )}
+
+      {/* User Modal */}
+      {isUserModalOpen && (
+        <UserModal
+          user={editingUser}
+          onClose={() => setIsUserModalOpen(false)}
+          onSave={() => {
+            setIsUserModalOpen(false)
+            loadData()
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+// User Modal Component
+function UserModal({
+  user,
+  onClose,
+  onSave
+}: {
+  user: UserProfile | null
+  onClose: () => void
+  onSave: () => void
+}): React.ReactElement {
+  const [fullName, setFullName] = useState(user?.full_name || '')
+  const [role, setRole] = useState<UserProfile['role']>(user?.role || 'requester')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
+  const { showNotification } = useNotification()
+
+  const handleSubmit = async (e: React.FormEvent): Promise<void> => {
+    e.preventDefault()
+    setIsSaving(true)
+    try {
+      if (user) {
+        // Edit existing profile
+        await updateUserProfile(user.id, { full_name: fullName, role })
+        showNotification('Profil mis à jour avec succès', 'success')
+      } else {
+        // Create new user via RPC
+        if (!email || !password) {
+          throw new Error('Email et mot de passe requis pour un nouveau profil')
+        }
+        await adminCreateUser(email, password, fullName, role)
+        showNotification('Utilisateur créé avec succès', 'success')
+      }
+      onSave()
+    } catch (err: unknown) {
+      showNotification(`Erreur: ${getErrorMessage(err)}`, 'error')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-card w-full max-w-md rounded-lg border border-border shadow-lg overflow-hidden">
+        <form onSubmit={handleSubmit}>
+          <div className="p-6 border-b border-border">
+            <h2 className="text-xl font-semibold">
+              {user ? 'Modifier le Profil' : 'Nouveau Utilisateur'}
+            </h2>
+          </div>
+
+          <div className="p-6 space-y-4">
+            {!user && (
+              <>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Email</label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full px-3 py-2 border border-input rounded-md bg-background"
+                    placeholder="email@exemple.com"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Mot de passe</label>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full px-3 py-2 border border-input rounded-md bg-background"
+                    required
+                    minLength={6}
+                  />
+                </div>
+              </>
+            )}
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Nom Complet</label>
+              <input
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                className="w-full px-3 py-2 border border-input rounded-md bg-background"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Rôle</label>
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value as UserProfile['role'])}
+                className="w-full px-3 py-2 border border-input rounded-md bg-background"
+              >
+                <option value="requester">Demandeur</option>
+                <option value="cashier">Caissier</option>
+                <option value="controller">Contrôleur</option>
+                <option value="cfo">DAF</option>
+                <option value="accountant">Comptable</option>
+                <option value="admin">Administrateur</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="p-6 border-t border-border flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border border-border rounded-md hover:bg-secondary transition-colors"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              {isSaving ? 'Enregistrement...' : 'Enregistrer'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   )
 }

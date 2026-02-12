@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../services/supabase'
 
-type UserRole = 'admin' | 'controller' | 'cfo' | 'cashier' | 'requester'
+type UserRole = 'admin' | 'controller' | 'cfo' | 'cashier' | 'requester' | 'accountant'
 
 interface Profile {
   id: string
@@ -24,7 +24,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   profile: null,
   loading: true,
-  signOut: async () => {}
+  signOut: async () => { }
 })
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }): React.ReactElement => {

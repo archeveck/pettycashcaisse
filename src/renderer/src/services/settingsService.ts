@@ -168,7 +168,7 @@ export const deleteAnalyticalAccount = async (id: string): Promise<void> => {
 export interface UserProfile {
   id: string
   full_name: string | null
-  role: 'admin' | 'controller' | 'cfo' | 'cashier' | 'requester'
+  role: 'admin' | 'controller' | 'cfo' | 'cashier' | 'requester' | 'accountant'
   avatar_url: string | null
   updated_at: string | null
 }
@@ -190,6 +190,35 @@ export const updateUserRole = async (userId: string, role: UserProfile['role']):
     .eq('id', userId)
 
   if (error) throw error
+}
+
+export const updateUserProfile = async (
+  userId: string,
+  updates: Partial<Omit<UserProfile, 'id' | 'updated_at'>>
+): Promise<void> => {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', userId)
+
+  if (error) throw error
+}
+
+export const adminCreateUser = async (
+  email: string,
+  password: string,
+  fullName: string,
+  role: UserProfile['role']
+): Promise<string> => {
+  const { data, error } = await supabase.rpc('admin_create_user', {
+    p_email: email,
+    p_password: password,
+    p_full_name: fullName,
+    p_role: role
+  })
+
+  if (error) throw error
+  return data as string
 }
 
 // Suppliers

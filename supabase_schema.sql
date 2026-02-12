@@ -1,11 +1,13 @@
--- Enable UUID extension
+-- Enable Extensions
 create extension if not exists "uuid-ossp";
+create extension if not exists "pgcrypto" with schema extensions;
 
 -- 1. PROFILES (Extends auth.users)
 DO $$ BEGIN
-    CREATE TYPE user_role AS ENUM ('admin', 'controller', 'cfo', 'cashier', 'requester');
+    CREATE TYPE user_role AS ENUM ('admin', 'controller', 'cfo', 'cashier', 'requester', 'accountant');
 EXCEPTION
-    WHEN duplicate_object THEN null;
+    WHEN duplicate_object THEN 
+        ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'accountant';
 END $$;
 
 create table if not exists public.profiles (
@@ -89,6 +91,7 @@ create table if not exists public.cash_transactions (
   created_by uuid references public.profiles(id) not null,
   analytical_account_id uuid references public.analytical_accounts(id), -- Nullable for inflows
   request_id uuid references public.cash_requests(id), -- Nullable for inflows or direct outflows (if allowed)
+  accounting_account_id uuid references public.accounting_accounts(id),
   
   proof_document_url text,
   proof_submitted_at timestamptz,
@@ -162,6 +165,12 @@ BEGIN
     DROP POLICY IF EXISTS "Admin can update analytical accounts" ON public.analytical_accounts;
     DROP POLICY IF EXISTS "Admin can delete analytical accounts" ON public.analytical_accounts;
     
+    -- Admin Policies - Accounting Accounts
+    DROP POLICY IF EXISTS "Accounting Accounts viewable by authenticated" ON public.accounting_accounts;
+    DROP POLICY IF EXISTS "Admin can insert accounting accounts" ON public.accounting_accounts;
+    DROP POLICY IF EXISTS "Admin can update accounting accounts" ON public.accounting_accounts;
+    DROP POLICY IF EXISTS "Admin can delete accounting accounts" ON public.accounting_accounts;
+    
     -- Admin Policies - App Settings
     DROP POLICY IF EXISTS "Admin can view app settings" ON public.app_settings;
     DROP POLICY IF EXISTS "Admin can update app settings" ON public.app_settings;
@@ -185,7 +194,7 @@ create policy "Accounting Accounts viewable by authenticated" on public.accounti
 -- Controller/CFO/Cashier/Admin can see all.
 create policy "Requester see own requests" on public.cash_requests for select using (auth.uid() = requester_id);
 create policy "Staff see all requests" on public.cash_requests for select using (
-  exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'controller', 'cfo', 'cashier'))
+  exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'controller', 'cfo', 'cashier', 'accountant'))
 );
 create policy "Requester can insert requests" on public.cash_requests for insert with check (auth.uid() = requester_id);
 
@@ -293,8 +302,93 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
 
+-- Drop function first to allow parameter name changes
+DROP FUNCTION IF EXISTS public.admin_create_user(text, text, text, user_role);
+
+-- Helper function for admin user creation
+CREATE OR REPLACE FUNCTION public.admin_create_user(
+  p_email TEXT,
+  p_password TEXT,
+  p_full_name TEXT,
+  p_role user_role
+) RETURNS UUID AS $$
+DECLARE
+  new_user_id UUID;
+BEGIN
+  new_user_id := extensions.gen_random_uuid();
+
+  -- 1. Create the auth user
+  INSERT INTO auth.users (
+    id,
+    instance_id, 
+    email, 
+    encrypted_password, 
+    email_confirmed_at, 
+    raw_app_meta_data, 
+    raw_user_meta_data, 
+    created_at, 
+    updated_at, 
+    role, 
+    aud,
+    confirmation_token,
+    recovery_token,
+    email_change_token_new,
+    email_change
+  )
+  VALUES (
+    new_user_id,
+    '00000000-0000-0000-0000-000000000000', 
+    p_email, 
+    -- Use extensions schema explicitly for pgcrypto functions
+    extensions.crypt(p_password, extensions.gen_salt('bf')), 
+    now(), 
+    '{"provider":"email","providers":["email"]}', 
+    jsonb_build_object('full_name', p_full_name), 
+    now(), 
+    now(), 
+    'authenticated', 
+    'authenticated',
+    '',
+    '',
+    '',
+    ''
+  );
+
+  -- 2. Create the identity
+  INSERT INTO auth.identities (
+    id,
+    user_id,
+    identity_data,
+    provider,
+    provider_id,
+    last_sign_in_at,
+    created_at,
+    updated_at
+  )
+  VALUES (
+    extensions.gen_random_uuid(),
+    new_user_id,
+    format('{"sub":"%s","email":"%s"}', new_user_id, p_email)::jsonb,
+    'email',
+    p_email,
+    now(),
+    now(),
+    now()
+  );
+
+  -- 3. Update profile role (profile is created automatically by the trigger)
+  UPDATE public.profiles SET role = p_role WHERE id = new_user_id;
+
+  RETURN new_user_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions;
+
 -- Seed Initial Settings
 insert into public.app_settings (key, value) values 
 ('max_outflow_limit', '250000'),
 ('alert_threshold', '50000')
 on conflict (key) do nothing;
+
+-- Ensure column exists for existing installations
+ALTER TABLE public.cash_transactions 
+ADD COLUMN IF NOT EXISTS accounting_account_id uuid REFERENCES public.accounting_accounts(id);
