@@ -17,6 +17,7 @@ import Reports from './pages/Reports'
 import Settings from './pages/Settings'
 import AccountantDashboard from './pages/AccountantDashboard'
 import Unauthorized from './pages/Unauthorized'
+import NotificationTest from './pages/NotificationTest'
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
@@ -71,6 +72,9 @@ function App(): React.ReactElement {
                   <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
                     <Route path="/settings" element={<Settings />} />
                   </Route>
+
+                  {/* Notification Test Page - accessible to all authenticated users */}
+                  <Route path="/notification-test" element={<NotificationTest />} />
                 </Route>
               </Route>
 
