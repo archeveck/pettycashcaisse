@@ -6,12 +6,12 @@ services:
     image: supabase/studio:20250113-6447c23
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --spider --tries=1 --timeout=5 http://localhost:3000/api/profile || exit 1"]
+      test: [ 'CMD-SHELL', 'wget --no-verbose --spider --tries=1 --timeout=5 http://localhost:3000/api/profile || exit 1' ]
       interval: 5s
       timeout: 5s
       retries: 3
     ports:
-      - "${STUDIO_PORT}:3000"
+      - '${STUDIO_PORT}:3000'
     environment:
       STUDIO_PG_META_URL: http://meta:8080
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -30,10 +30,10 @@ services:
     image: kong:2.8.1
     restart: unless-stopped
     ports:
-      - "${KONG_HTTP_PORT}:8000"
-      - "${KONG_HTTPS_PORT}:8443"
+      - '${KONG_HTTP_PORT}:8000'
+      - '${KONG_HTTPS_PORT}:8443'
     environment:
-      KONG_DATABASE: "off"
+      KONG_DATABASE: 'off'
       KONG_DECLARATIVE_CONFIG: /var/lib/kong/kong.yml
       # Default is http://localhost:8001
       KONG_DNS_ORDER: LAST,A,CNAME
@@ -54,7 +54,7 @@ services:
     image: supabase/gotrue:v2.132.3
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --spider --tries=1 --timeout=5 http://localhost:9999/health || exit 1"]
+      test: [ 'CMD-SHELL', 'wget --no-verbose --spider --tries=1 --timeout=5 http://localhost:9999/health || exit 1' ]
       interval: 5s
       timeout: 5s
       retries: 3
@@ -74,7 +74,7 @@ services:
       GOTRUE_RATES_LIMIT: 1000
       GOTRUE_RATES_WINDOW: 60
       GOTRUE_DISABLE_SIGNUP: ${DISABLE_SIGNUP}
-      GOTRUE_MAILER_AUTOCONFIRM: "true"
+      GOTRUE_MAILER_AUTOCONFIRM: 'true'
       # GOTRUE_SMS_AUTOCONFIRM: "true"
       # GOTRUE_OTP_EXP: 86400
       # GOTRUE_OTP_LENGTH: 6
@@ -86,7 +86,7 @@ services:
     image: postgrest/postgrest:v12.2.0
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "head -n 1 /dev/tcp/127.0.0.1/3000 || exit 1"]
+      test: [ 'CMD-SHELL', 'head -n 1 /dev/tcp/127.0.0.1/3000 || exit 1' ]
       interval: 5s
       timeout: 5s
       retries: 3
@@ -95,7 +95,7 @@ services:
       PGRST_DB_SCHEMAS: public,storage,graphql
       PGRST_DB_ANON_ROLE: anon
       PGRST_JWT_SECRET: ${JWT_SECRET}
-      PGRST_DB_USE_LEGACY_GUCS: "false"
+      PGRST_DB_USE_LEGACY_GUCS: 'false'
     depends_on:
       - db
 
@@ -104,7 +104,7 @@ services:
     image: supabase/realtime:v2.33.58
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/4000' || exit 1"]
+      test: [ 'CMD-SHELL', "bash -c ':> /dev/tcp/127.0.0.1/4000' || exit 1" ]
       interval: 5s
       timeout: 5s
       retries: 3
@@ -131,7 +131,7 @@ services:
     image: supabase/storage-api:v1.11.13
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --spider --tries=1 --timeout=5 http://localhost:5000/status || exit 1"]
+      test: [ 'CMD-SHELL', 'wget --no-verbose --spider --tries=1 --timeout=5 http://localhost:5000/status || exit 1' ]
       interval: 5s
       timeout: 5s
       retries: 3
@@ -159,17 +159,17 @@ services:
     image: darthsim/imgproxy:v3.26.0
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "head -n 1 /dev/tcp/127.0.0.1/8080 || exit 1"]
+      test: [ 'CMD-SHELL', 'head -n 1 /dev/tcp/127.0.0.1/8080 || exit 1' ]
       interval: 5s
       timeout: 5s
       retries: 3
     environment:
       IMGPROXY_BIND: :5001
       IMGPROXY_LOCAL_FILESYSTEM_ROOT: /
-      IMGPROXY_USE_ETAG: "true"
-      IMGPROXY_ENABLE_WEBP_DETECTION: "true"
+      IMGPROXY_USE_ETAG: 'true'
+      IMGPROXY_ENABLE_WEBP_DETECTION: 'true'
       IMGPROXY_MALLOC: jemalloc
-      IMGPROXY_SO_REUSEPORT: "true"
+      IMGPROXY_SO_REUSEPORT: 'true'
       IMGPROXY_GZIP_COMPRESSION: 0
       IMGPROXY_COST_TIMER: 0
       IMGPROXY_LOG_FORMAT: json
@@ -181,7 +181,7 @@ services:
     image: supabase/postgres-meta:v0.84.2
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --spider --tries=1 --timeout=5 http://localhost:8080/health || exit 1"]
+      test: [ 'CMD-SHELL', 'wget --no-verbose --spider --tries=1 --timeout=5 http://localhost:8080/health || exit 1' ]
       interval: 5s
       timeout: 5s
       retries: 3
@@ -195,12 +195,30 @@ services:
     depends_on:
       - db
 
+  functions:
+    container_name: supabase-requests
+    image: supabase/edge-runtime:v1.54.3
+    restart: unless-stopped
+    ports:
+      - '54321:54321'
+    environment:
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
+      POSTGRES_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      JWT_SECRET: ${JWT_SECRET}
+    volumes:
+      - ./functions:/home/deno/functions
+    depends_on:
+      - db
+      - kong
+
   db:
     container_name: supabase-db
     image: supabase/postgres:15.6.1.141
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -h 127.0.0.1"]
+      test: [ 'CMD-SHELL', 'pg_isready -U postgres -h 127.0.0.1' ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -211,7 +229,7 @@ services:
       # - -c
       # - log_min_messages=fatal # Reduces log verbosity
     ports:
-      - "${POSTGRES_PORT}:5432"
+      - '${POSTGRES_PORT}:5432'
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
@@ -220,6 +238,19 @@ services:
       - ./volumes/db/init:/docker-entrypoint-initdb.d
       # Mount the project schema to be auto-applied on fresh install
       - ../supabase_schema.sql:/docker-entrypoint-initdb.d/init-project.sql
+
+  postfix:
+    container_name: supabase-postfix
+    image: boky/postfix
+    restart: always
+    ports:
+      - '2525:25'
+    environment:
+      RELAYHOST: smtp.gmail.com:587
+      SMTP_LOGIN: ${SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      ALLOWED_SENDER_DOMAINS: '*'
+      MYHOSTNAME: pettycash.local
 
 volumes:
   db-data:

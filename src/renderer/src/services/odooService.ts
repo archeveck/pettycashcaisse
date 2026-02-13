@@ -92,14 +92,24 @@ export const fetchOdooAccountAccounts = async (
     config.password,
     'account.account',
     'search_read',
-    [[['deprecated', '=', false], ['company_id', '=', 1]]],
+    [
+      [
+        ['deprecated', '=', false],
+        ['company_id', '=', 1]
+      ]
+    ],
     { fields: ['id', 'name', 'code'] }
   ])
 }
 
 export const syncOdooData = async (
   config: OdooConfig
-): Promise<{ projects: number; accounts: number; suppliers: number; accountingAccounts: number }> => {
+): Promise<{
+  projects: number
+  accounts: number
+  suppliers: number
+  accountingAccounts: number
+}> => {
   const uid = await authenticateOdoo(config)
   if (!uid) throw new Error('Échec de l’authentification Odoo')
 
@@ -297,7 +307,7 @@ export const syncOdooData = async (
             })
             .eq('id', existingByCode.id)
         } else {
-          // Conflict: different odoo_id has same code. 
+          // Conflict: different odoo_id has same code.
           // We must ensure the code is unique to avoid 409.
           const uniqueCode = `${accountCode}_${oa.id}`
           await supabase.from('analytical_accounts').insert({

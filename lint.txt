@@ -1,0 +1,19 @@
+
+> caisse-pettycash@1.0.0 lint
+> eslint --cache . --no-color src/renderer/src/pages/AccountantDashboard.tsx
+
+
+Oops! Something went wrong! :(
+
+ESLint: 9.39.1
+
+RangeError: Invalid string length
+    at Array.join (<anonymous>)
+    at module.exports (/Volumes/Darkmoons/Documents - MacBook Pro de Aihiba HABIBI/caissePettycash/node_modules/eslint/lib/shared/text-table.js:67:4)
+    at /Volumes/Darkmoons/Documents - MacBook Pro de Aihiba HABIBI/caissePettycash/node_modules/eslint/lib/cli-engine/formatters/stylish.js:51:16
+    at Array.forEach (<anonymous>)
+    at module.exports (/Volumes/Darkmoons/Documents - MacBook Pro de Aihiba HABIBI/caissePettycash/node_modules/eslint/lib/cli-engine/formatters/stylish.js:37:10)
+    at Object.format (/Volumes/Darkmoons/Documents - MacBook Pro de Aihiba HABIBI/caissePettycash/node_modules/eslint/lib/eslint/eslint.js:1269:12)
+    at printResults (/Volumes/Darkmoons/Documents - MacBook Pro de Aihiba HABIBI/caissePettycash/node_modules/eslint/lib/cli.js:123:33)
+    at async Object.execute (/Volumes/Darkmoons/Documents - MacBook Pro de Aihiba HABIBI/caissePettycash/node_modules/eslint/lib/cli.js:509:4)
+    at async main (/Volumes/Darkmoons/Documents - MacBook Pro de Aihiba HABIBI/caissePettycash/node_modules/eslint/bin/eslint.js:175:19)

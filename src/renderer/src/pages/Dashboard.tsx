@@ -176,7 +176,12 @@ export default function Dashboard(): React.ReactElement {
     }
 
     const targetStatus = 'pending_controller'
-    console.log('[Desktop Notifications] Setting up subscription for role:', profile.role, 'status:', targetStatus)
+    console.log(
+      '[Desktop Notifications] Setting up subscription for role:',
+      profile.role,
+      'status:',
+      targetStatus
+    )
 
     // Check notification permission
     if ('Notification' in window) {
@@ -200,11 +205,21 @@ export default function Dashboard(): React.ReactElement {
           console.log('[Desktop Notifications] Raw event received:', payload.eventType, payload)
 
           // Type assertion for payload
-          const newRecord = payload.new as { id: string; amount: number; status: string;[key: string]: unknown }
+          const newRecord = payload.new as {
+            id: string
+            amount: number
+            status: string
+            [key: string]: unknown
+          }
 
           // Client-side filter: only process if status matches our target
           if (newRecord.status !== targetStatus) {
-            console.log('[Desktop Notifications] Ignoring event - status mismatch:', newRecord.status, 'vs', targetStatus)
+            console.log(
+              '[Desktop Notifications] Ignoring event - status mismatch:',
+              newRecord.status,
+              'vs',
+              targetStatus
+            )
             return
           }
 
@@ -213,10 +228,12 @@ export default function Dashboard(): React.ReactElement {
           // Fetch requester details
           const { data: request, error } = await supabase
             .from('cash_requests')
-            .select(`
+            .select(
+              `
               amount,
               requester:profiles(full_name)
-            `)
+            `
+            )
             .eq('id', newRecord.id)
             .single()
 
@@ -230,7 +247,8 @@ export default function Dashboard(): React.ReactElement {
             const requesterData = Array.isArray(request.requester)
               ? request.requester[0]
               : request.requester
-            const requesterName = (requesterData as { full_name: string })?.full_name || 'Un utilisateur'
+            const requesterName =
+              (requesterData as { full_name: string })?.full_name || 'Un utilisateur'
             const amount = new Intl.NumberFormat('fr-FR').format(newRecord.amount)
 
             console.log('[Desktop Notifications] Showing notification for:', requesterName, amount)
@@ -348,24 +366,24 @@ export default function Dashboard(): React.ReactElement {
             profile?.role === 'admin' ||
             profile?.role === 'cfo' ||
             profile?.role === 'controller') && (
-              <div className="group p-6 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
-                <div className="relative z-10">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
-                      <DollarSign className="w-6 h-6 text-white" />
-                    </div>
-                    <h3 className="text-sm font-semibold text-white/90">Solde Actuel</h3>
+            <div className="group p-6 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
+              <div className="relative z-10">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+                    <DollarSign className="w-6 h-6 text-white" />
                   </div>
-                  <div className="text-3xl font-bold text-white">
-                    {new Intl.NumberFormat('fr-FR', {
-                      style: 'currency',
-                      currency: 'XOF'
-                    }).format(stats.currentBalance)}
-                  </div>
+                  <h3 className="text-sm font-semibold text-white/90">Solde Actuel</h3>
+                </div>
+                <div className="text-3xl font-bold text-white">
+                  {new Intl.NumberFormat('fr-FR', {
+                    style: 'currency',
+                    currency: 'XOF'
+                  }).format(stats.currentBalance)}
                 </div>
               </div>
-            )}
+            </div>
+          )}
 
           {/* Pending Validations - for controller */}
           {profile?.role === 'controller' && (

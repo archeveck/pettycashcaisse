@@ -2,7 +2,15 @@ import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../services/supabase'
-import { Loader2, TrendingUp, TrendingDown, Calendar, FileText, Upload, CheckCircle2 } from 'lucide-react'
+import {
+  Loader2,
+  TrendingUp,
+  TrendingDown,
+  Calendar,
+  FileText,
+  Upload,
+  CheckCircle2
+} from 'lucide-react'
 import { useNotification } from '../contexts/NotificationContext'
 import { getErrorMessage } from '../utils/errorUtils'
 import { uploadTransactionProof } from '../services/transactionService'
@@ -307,10 +315,11 @@ export default function Transactions(): React.ReactElement {
                     </td>
                     <td className="py-3">
                       <span
-                        className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${t.type === 'inflow'
-                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                          : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                          }`}
+                        className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${
+                          t.type === 'inflow'
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                            : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                        }`}
                       >
                         {t.type === 'inflow' ? (
                           <TrendingUp className="w-3 h-3" />
@@ -370,9 +379,14 @@ export default function Transactions(): React.ReactElement {
                             </a>
                           ) : (
                             <>
-                              <span className="text-xs text-yellow-600 font-medium whitespace-nowrap">⚠ Manquant</span>
+                              <span className="text-xs text-yellow-600 font-medium whitespace-nowrap">
+                                ⚠ Manquant
+                              </span>
                               {['admin', 'cashier'].includes(profile?.role || '') && (
-                                <label className="cursor-pointer p-1 bg-primary/10 hover:bg-primary/20 text-primary rounded transition-colors" title="Ajouter le justificatif">
+                                <label
+                                  className="cursor-pointer p-1 bg-primary/10 hover:bg-primary/20 text-primary rounded transition-colors"
+                                  title="Ajouter le justificatif"
+                                >
                                   {isUploadingProof === t.id ? (
                                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
                                   ) : (

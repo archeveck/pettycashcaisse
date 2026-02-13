@@ -173,16 +173,30 @@ export default function NewRequest(): React.ReactElement {
 
     setIsLoading(true)
     try {
-      const { error } = await supabase.from('cash_requests').insert({
-        requester_id: user.id,
-        amount: data.amount,
-        description: data.description,
-        analytical_account_id: data.analytical_account_id,
-        supplier_id: data.supplier_id || null,
-        status: 'pending_controller'
-      })
+      const { data: requestRes, error } = await supabase
+        .from('cash_requests')
+        .insert({
+          requester_id: user.id,
+          amount: data.amount,
+          description: data.description,
+          analytical_account_id: data.analytical_account_id,
+          supplier_id: data.supplier_id || null,
+          status: 'pending_controller'
+        })
+        .select()
+        .single()
 
       if (error) throw error
+
+      // Notify Controller
+      supabase.functions
+        .invoke('send-email', {
+          body: {
+            type: 'new_request',
+            requestId: requestRes.id
+          }
+        })
+        .catch((err) => console.error('Failed to send email notification:', err))
 
       showNotification('Demande créée avec succès !', 'success')
       navigate('/requests')

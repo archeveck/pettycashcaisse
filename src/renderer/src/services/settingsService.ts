@@ -111,11 +111,13 @@ export interface AnalyticalAccount {
   project_id: string
   name: string
   code: string
+  active: boolean
   created_at: string
   project?: {
     name: string
     code: string
   }
+  [key: string]: string | number | boolean | undefined | null | object
 }
 
 export const getAnalyticalAccounts = async (): Promise<AnalyticalAccount[]> => {
@@ -170,6 +172,7 @@ export interface UserProfile {
   full_name: string | null
   role: 'admin' | 'controller' | 'cfo' | 'cashier' | 'requester' | 'accountant'
   avatar_url: string | null
+  active: boolean
   updated_at: string | null
 }
 
@@ -221,6 +224,23 @@ export const adminCreateUser = async (
   return data as string
 }
 
+export const adminDeleteUser = async (userId: string): Promise<void> => {
+  const { error } = await supabase.rpc('admin_delete_user', {
+    p_user_id: userId
+  })
+
+  if (error) throw error
+}
+
+export const adminUpdateUserStatus = async (userId: string, active: boolean): Promise<void> => {
+  const { error } = await supabase.rpc('admin_update_user_status', {
+    p_user_id: userId,
+    p_active: active
+  })
+
+  if (error) throw error
+}
+
 // Suppliers
 export interface Supplier {
   id: string
@@ -263,6 +283,7 @@ export interface AccountingAccount {
   active: boolean
   odoo_id?: number
   created_at: string
+  [key: string]: string | number | boolean | undefined | null | object
 }
 
 export const getAccountingAccounts = async (): Promise<AccountingAccount[]> => {

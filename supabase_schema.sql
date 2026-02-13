@@ -15,6 +15,7 @@ create table if not exists public.profiles (
   full_name text,
   role user_role default 'requester',
   avatar_url text,
+  active boolean default true,
   updated_at timestamptz
 );
 
@@ -154,6 +155,12 @@ BEGIN
     
     -- Transactions
     DROP POLICY IF EXISTS "Transactions viewable by authenticated" ON public.cash_transactions;
+    DROP POLICY IF EXISTS "Staff can update transactions" ON public.cash_transactions;
+
+    -- Daily Closures
+    DROP POLICY IF EXISTS "Authenticated can view daily closures" ON public.daily_closures;
+    DROP POLICY IF EXISTS "Cashiers and Admins can create daily closures" ON public.daily_closures;
+    DROP POLICY IF EXISTS "Admins can update daily closures" ON public.daily_closures;
     
     -- Admin Policies - Projects
     DROP POLICY IF EXISTS "Admin can insert projects" ON public.projects;
@@ -202,6 +209,26 @@ create policy "Requester can insert requests" on public.cash_requests for insert
 -- Viewable by authenticated.
 -- Insertable by Cashier/Admin.
 create policy "Transactions viewable by authenticated" on public.cash_transactions for select using (auth.role() = 'authenticated');
+create policy "Staff can update transactions" on public.cash_transactions for update using (
+  exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'accountant'))
+);
+
+-- Daily Closures:
+create policy "Authenticated can view daily closures"
+  on public.daily_closures for select
+  using (auth.role() = 'authenticated');
+
+create policy "Cashiers and Admins can create daily closures"
+  on public.daily_closures for insert
+  with check (
+    exists (select 1 from public.profiles where id = auth.uid() and role in ('cashier', 'admin', 'controller'))
+  );
+
+create policy "Admins can update daily closures"
+  on public.daily_closures for update
+  using (
+    exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+  );
 
 -- Admin policies for managing projects
 create policy "Admin can insert projects" on public.projects for insert with check (
@@ -383,6 +410,30 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions;
 
+-- RPC to Delete User
+CREATE OR REPLACE FUNCTION public.admin_delete_user(p_user_id UUID)
+RETURNS VOID AS $$
+BEGIN
+  -- Profile is deleted automatically by cascade
+  DELETE FROM auth.users WHERE id = p_user_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- RPC to Toggle User Status
+CREATE OR REPLACE FUNCTION public.admin_update_user_status(p_user_id UUID, p_active BOOLEAN)
+RETURNS VOID AS $$
+BEGIN
+  UPDATE public.profiles SET active = p_active WHERE id = p_user_id;
+  
+  -- Optionally ban in auth.users as well for strict protection
+  IF p_active = false THEN
+    UPDATE auth.users SET banned_until = '2099-01-01T00:00:00Z' WHERE id = p_user_id;
+  ELSE
+    UPDATE auth.users SET banned_until = NULL WHERE id = p_user_id;
+  END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions;
+
 -- Seed Initial Settings
 insert into public.app_settings (key, value) values 
 ('max_outflow_limit', '250000'),
@@ -392,3 +443,25 @@ on conflict (key) do nothing;
 -- Ensure column exists for existing installations
 ALTER TABLE public.cash_transactions 
 ADD COLUMN IF NOT EXISTS accounting_account_id uuid REFERENCES public.accounting_accounts(id);
+
+-- Ensure updated_at exists
+ALTER TABLE public.cash_transactions ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
+
+-- Trigger function for updated_at (if not exists)
+CREATE OR REPLACE FUNCTION public.update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = now();
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- Trigger for cash_transactions
+DO $$ BEGIN
+    CREATE TRIGGER update_cash_transactions_updated_at
+        BEFORE UPDATE ON public.cash_transactions
+        FOR EACH ROW
+        EXECUTE PROCEDURE public.update_updated_at_column();
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;

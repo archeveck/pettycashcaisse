@@ -225,9 +225,7 @@ export default function MyRequests(): React.ReactElement {
       )}
 
       {/* Voucher Modal */}
-      {voucherData && (
-        <CashVoucher data={voucherData} onClose={() => setVoucherData(null)} />
-      )}
+      {voucherData && <CashVoucher data={voucherData} onClose={() => setVoucherData(null)} />}
     </div>
   )
 }

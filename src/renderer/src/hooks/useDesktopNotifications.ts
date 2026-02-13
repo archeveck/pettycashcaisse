@@ -22,7 +22,7 @@ export function useDesktopNotifications(): {
 
   const showDesktopNotification = (options: DesktopNotificationOptions): void => {
     console.log('[useDesktopNotifications] Attempting to show notification:', options.title)
-      
+
     // Check if notifications are supported and permitted
     if (!('Notification' in window)) {
       console.warn('[useDesktopNotifications] Desktop notifications not supported')

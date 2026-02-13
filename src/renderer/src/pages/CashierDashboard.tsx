@@ -4,7 +4,17 @@ import { useAuth } from '../hooks/useAuth'
 import { useNotification } from '../contexts/NotificationContext'
 import { getErrorMessage } from '../utils/errorUtils'
 import { getAppSettings } from '../services/settingsService'
-import { Loader2, DollarSign, Lock, Plus, AlertCircle, Upload, CheckCircle2, History as HistoryIcon, Printer } from 'lucide-react'
+import {
+  Loader2,
+  DollarSign,
+  Lock,
+  Plus,
+  AlertCircle,
+  Upload,
+  CheckCircle2,
+  History as HistoryIcon,
+  Printer
+} from 'lucide-react'
 import CashVoucher, { VoucherData } from '../components/CashVoucher'
 import { uploadTransactionProof } from '../services/transactionService'
 import { format } from 'date-fns'
@@ -122,7 +132,8 @@ export default function CashierDashboard(): React.ReactElement {
       // Fetch Recent Transactions
       const { data: recentTrans, error: recentError } = await supabase
         .from('cash_transactions')
-        .select(`
+        .select(
+          `
           id,
           type,
           amount,
@@ -143,7 +154,8 @@ export default function CashierDashboard(): React.ReactElement {
               )
             )
           )
-        `)
+        `
+        )
         .order('date', { ascending: false })
         .limit(10)
 
@@ -166,7 +178,10 @@ export default function CashierDashboard(): React.ReactElement {
       setBalance(currentBalance)
     } catch (err: unknown) {
       console.error('Error fetching cashier data:', err)
-      showNotification(`Erreur lors du chargement des données de la caisse: ${getErrorMessage(err)}`, 'error')
+      showNotification(
+        `Erreur lors du chargement des données de la caisse: ${getErrorMessage(err)}`,
+        'error'
+      )
     } finally {
       setIsLoading(false)
     }
@@ -428,12 +443,20 @@ export default function CashierDashboard(): React.ReactElement {
                 <div key={t.id} className="p-3 bg-card border border-border rounded-lg shadow-sm">
                   <div className="flex justify-between items-start">
                     <div className="flex gap-3">
-                      <div className={`mt-1 p-1.5 rounded-full ${t.type === 'inflow' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                        {t.type === 'inflow' ? <Plus className="w-3 h-3" /> : <DollarSign className="w-3 h-3" />}
+                      <div
+                        className={`mt-1 p-1.5 rounded-full ${t.type === 'inflow' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}
+                      >
+                        {t.type === 'inflow' ? (
+                          <Plus className="w-3 h-3" />
+                        ) : (
+                          <DollarSign className="w-3 h-3" />
+                        )}
                       </div>
                       <div>
                         <p className="text-sm font-medium leading-none">
-                          {t.type === 'outflow' ? t.request?.requester.full_name : 'Entrée de caisse'}
+                          {t.type === 'outflow'
+                            ? t.request?.requester.full_name
+                            : 'Entrée de caisse'}
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">{t.description}</p>
                         <p className="text-[10px] text-muted-foreground mt-0.5">
@@ -442,8 +465,11 @@ export default function CashierDashboard(): React.ReactElement {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className={`text-sm font-bold ${t.type === 'inflow' ? 'text-green-600' : 'text-foreground'}`}>
-                        {t.type === 'inflow' ? '+' : '-'} {new Intl.NumberFormat('fr-FR').format(t.amount)}
+                      <p
+                        className={`text-sm font-bold ${t.type === 'inflow' ? 'text-green-600' : 'text-foreground'}`}
+                      >
+                        {t.type === 'inflow' ? '+' : '-'}{' '}
+                        {new Intl.NumberFormat('fr-FR').format(t.amount)}
                       </p>
                       {t.type === 'outflow' && (
                         <div className="mt-2 flex justify-end">
@@ -459,8 +485,13 @@ export default function CashierDashboard(): React.ReactElement {
                             </a>
                           ) : (
                             <div className="flex items-center gap-2">
-                              <span className="text-[10px] text-red-500 font-medium">Justificatif Manquant</span>
-                              <label className="cursor-pointer p-1 bg-primary/10 hover:bg-primary/20 text-primary rounded transition-colors" title="Ajouter le justificatif">
+                              <span className="text-[10px] text-red-500 font-medium">
+                                Justificatif Manquant
+                              </span>
+                              <label
+                                className="cursor-pointer p-1 bg-primary/10 hover:bg-primary/20 text-primary rounded transition-colors"
+                                title="Ajouter le justificatif"
+                              >
                                 {isUploadingProof === t.id ? (
                                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
                                 ) : (
@@ -511,146 +542,142 @@ export default function CashierDashboard(): React.ReactElement {
       </div>
 
       {/* Disburse Modal */}
-      {
-        selectedRequest && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-card p-6 rounded-lg border border-border shadow-lg max-w-md w-full">
-              <h2 className="text-xl font-semibold mb-4">Décaisser</h2>
+      {selectedRequest && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-card p-6 rounded-lg border border-border shadow-lg max-w-md w-full">
+            <h2 className="text-xl font-semibold mb-4">Décaisser</h2>
 
-              <div className="space-y-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Demandeur</p>
-                  <p className="font-medium">{selectedRequest.requester.full_name}</p>
-                </div>
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Demandeur</p>
+                <p className="font-medium">{selectedRequest.requester.full_name}</p>
+              </div>
 
-                <div>
-                  <p className="text-sm text-muted-foreground">Montant</p>
-                  <p className="font-bold text-lg">
-                    {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XOF' }).format(
-                      selectedRequest.amount
-                    )}
+              <div>
+                <p className="text-sm text-muted-foreground">Montant</p>
+                <p className="font-bold text-lg">
+                  {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XOF' }).format(
+                    selectedRequest.amount
+                  )}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-sm text-muted-foreground">Description</p>
+                <p>{selectedRequest.description}</p>
+              </div>
+
+              {maxOutflowLimit > 0 && (
+                <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-md">
+                  <AlertCircle className="w-4 h-4 text-muted-foreground" />
+                  <p className="text-xs text-muted-foreground">
+                    Limite maximale: <strong>{maxOutflowLimit.toLocaleString('fr-FR')} FCFA</strong>
                   </p>
                 </div>
+              )}
 
-                <div>
-                  <p className="text-sm text-muted-foreground">Description</p>
-                  <p>{selectedRequest.description}</p>
-                </div>
-
-                {maxOutflowLimit > 0 && (
-                  <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-md">
-                    <AlertCircle className="w-4 h-4 text-muted-foreground" />
-                    <p className="text-xs text-muted-foreground">
-                      Limite maximale: <strong>{maxOutflowLimit.toLocaleString('fr-FR')} FCFA</strong>
-                    </p>
-                  </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Justificatif (Optionnel)</label>
+                <input
+                  type="file"
+                  accept="image/*,application/pdf"
+                  onChange={(e) => setProofFile(e.target.files?.[0] || null)}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium"
+                />
+                {proofFile && (
+                  <p className="text-xs text-muted-foreground">Sélectionné : {proofFile.name}</p>
                 )}
+              </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Justificatif (Optionnel)</label>
-                  <input
-                    type="file"
-                    accept="image/*,application/pdf"
-                    onChange={(e) => setProofFile(e.target.files?.[0] || null)}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium"
-                  />
-                  {proofFile && (
-                    <p className="text-xs text-muted-foreground">Sélectionné : {proofFile.name}</p>
+              <div className="flex gap-2 justify-end pt-4">
+                <button
+                  type="button"
+                  onClick={() => setSelectedRequest(null)}
+                  disabled={!!processingId}
+                  className="px-4 py-2 border border-border rounded-md hover:bg-secondary transition-colors disabled:opacity-50"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={confirmDisburse}
+                  disabled={!!processingId}
+                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                >
+                  {processingId ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Traitement...
+                    </>
+                  ) : (
+                    'Confirmer le Décaissement'
                   )}
-                </div>
-
-                <div className="flex gap-2 justify-end pt-4">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedRequest(null)}
-                    disabled={!!processingId}
-                    className="px-4 py-2 border border-border rounded-md hover:bg-secondary transition-colors disabled:opacity-50"
-                  >
-                    Annuler
-                  </button>
-                  <button
-                    onClick={confirmDisburse}
-                    disabled={!!processingId}
-                    className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center gap-2"
-                  >
-                    {processingId ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Traitement...
-                      </>
-                    ) : (
-                      'Confirmer le Décaissement'
-                    )}
-                  </button>
-                </div>
+                </button>
               </div>
             </div>
           </div>
-        )
-      }
+        </div>
+      )}
 
       {/* Inflow Modal */}
-      {
-        isInflowModalOpen && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-card p-6 rounded-lg border border-border shadow-lg max-w-md w-full">
-              <h2 className="text-xl font-semibold mb-4">Ajouter une Entrée de Caisse</h2>
+      {isInflowModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-card p-6 rounded-lg border border-border shadow-lg max-w-md w-full">
+            <h2 className="text-xl font-semibold mb-4">Ajouter une Entrée de Caisse</h2>
 
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Montant (FCFA)</label>
-                  <input
-                    type="number"
-                    value={inflowAmount || ''}
-                    onChange={(e) => setInflowAmount(Number(e.target.value))}
-                    placeholder="Entrer le montant"
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    autoFocus
-                  />
-                </div>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Montant (FCFA)</label>
+                <input
+                  type="number"
+                  value={inflowAmount || ''}
+                  onChange={(e) => setInflowAmount(Number(e.target.value))}
+                  placeholder="Entrer le montant"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  autoFocus
+                />
+              </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Description</label>
-                  <textarea
-                    value={inflowDescription}
-                    onChange={(e) => setInflowDescription(e.target.value)}
-                    placeholder="Entrer la description (optionnel)"
-                    className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  />
-                </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Description</label>
+                <textarea
+                  value={inflowDescription}
+                  onChange={(e) => setInflowDescription(e.target.value)}
+                  placeholder="Entrer la description (optionnel)"
+                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                />
+              </div>
 
-                <div className="flex gap-2 justify-end pt-4">
-                  <button
-                    type="button"
-                    onClick={() => setIsInflowModalOpen(false)}
-                    disabled={isProcessingInflow}
-                    className="px-4 py-2 border border-border rounded-md hover:bg-secondary transition-colors disabled:opacity-50"
-                  >
-                    Annuler
-                  </button>
-                  <button
-                    onClick={handleInflow}
-                    disabled={isProcessingInflow || inflowAmount <= 0}
-                    className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center gap-2"
-                  >
-                    {isProcessingInflow ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Traitement...
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="w-4 h-4" />
-                        Ajouter l&apos;Entrée
-                      </>
-                    )}
-                  </button>
-                </div>
+              <div className="flex gap-2 justify-end pt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsInflowModalOpen(false)}
+                  disabled={isProcessingInflow}
+                  className="px-4 py-2 border border-border rounded-md hover:bg-secondary transition-colors disabled:opacity-50"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={handleInflow}
+                  disabled={isProcessingInflow || inflowAmount <= 0}
+                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                >
+                  {isProcessingInflow ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Traitement...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4" />
+                      Ajouter l&apos;Entrée
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>
-        )
-      }
+        </div>
+      )}
 
       {/* Voucher Modal */}
       {voucherData && <CashVoucher data={voucherData} onClose={() => setVoucherData(null)} />}

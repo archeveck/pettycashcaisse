@@ -52,7 +52,9 @@ function App(): React.ReactElement {
 
                   <Route
                     element={
-                      <ProtectedRoute allowedRoles={['cashier', 'controller', 'cfo', 'requester']} />
+                      <ProtectedRoute
+                        allowedRoles={['cashier', 'controller', 'cfo', 'requester']}
+                      />
                     }
                   >
                     <Route path="/transactions" element={<Transactions />} />

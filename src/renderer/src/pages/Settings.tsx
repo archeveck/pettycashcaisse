@@ -1,7 +1,16 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { useNotification } from '../contexts/NotificationContext'
-import { Loader2, Save, Plus, Edit2, Trash2, Settings as SettingsIcon } from 'lucide-react'
+import {
+  Loader2,
+  Save,
+  Plus,
+  Edit2,
+  Trash2,
+  Settings as SettingsIcon,
+  UserCheck,
+  UserMinus
+} from 'lucide-react'
 import {
   getAppSettings,
   updateAppSetting,
@@ -14,9 +23,10 @@ import {
   updateAnalyticalAccount,
   deleteAnalyticalAccount,
   getUsers,
-  updateUserRole,
   updateUserProfile,
   adminCreateUser,
+  adminDeleteUser,
+  adminUpdateUserStatus,
   getOdooConfig,
   getSuppliers,
   updateSupplier,
@@ -33,6 +43,7 @@ import {
 } from '../services/settingsService'
 import { syncOdooData } from '../services/odooService'
 import { getErrorMessage } from '../utils/errorUtils'
+import { clsx } from 'clsx'
 
 type TabType = 'app' | 'projects' | 'accounts' | 'accounting' | 'suppliers' | 'users' | 'odoo'
 
@@ -69,7 +80,8 @@ export default function Settings(): React.ReactElement {
   // Accounting Accounts
   const [accountingAccounts, setAccountingAccounts] = useState<AccountingAccount[]>([])
   const [isAccountingModalOpen, setIsAccountingModalOpen] = useState(false)
-  const [editingAccountingAccount, setEditingAccountingAccount] = useState<AccountingAccount | null>(null)
+  const [editingAccountingAccount, setEditingAccountingAccount] =
+    useState<AccountingAccount | null>(null)
 
   // Odoo Settings
   const [odooUrl, setOdooUrl] = useState('')
@@ -78,7 +90,6 @@ export default function Settings(): React.ReactElement {
   const [odooPass, setOdooPass] = useState('')
   const [isSavingOdoo, setIsSavingOdoo] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
-
 
   const loadData = useCallback(async (): Promise<void> => {
     setIsLoading(true)
@@ -152,6 +163,51 @@ export default function Settings(): React.ReactElement {
       setAccounts((prev) => prev.filter((a) => a.id !== id))
     } catch (err: unknown) {
       alert('Échec de la suppression du compte : ' + getErrorMessage(err))
+    }
+  }
+
+  const handleDeleteUser = async (userId: string): Promise<void> => {
+    if (userId === profile?.id) {
+      alert('Vous ne pouvez pas supprimer votre propre compte.')
+      return
+    }
+
+    if (
+      !confirm(
+        'Êtes-vous sûr de vouloir supprimer cet utilisateur ? Cette action est irréversible.'
+      )
+    ) {
+      return
+    }
+
+    try {
+      await adminDeleteUser(userId)
+      setUsers((prev) => prev.filter((u) => u.id !== userId))
+      alert('Utilisateur supprimé avec succès')
+    } catch (err: unknown) {
+      alert('Échec de la suppression : ' + getErrorMessage(err))
+    }
+  }
+
+  const handleToggleUserStatus = async (userId: string, currentStatus: boolean): Promise<void> => {
+    if (userId === profile?.id) {
+      alert('Vous ne pouvez pas désactiver votre propre compte.')
+      return
+    }
+
+    const newStatus = !currentStatus
+    const action = newStatus ? 'réactiver' : 'désactiver'
+
+    if (!confirm(`Voulez-vous vraiment ${action} cet utilisateur ?`)) {
+      return
+    }
+
+    try {
+      await adminUpdateUserStatus(userId, newStatus)
+      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, active: newStatus } : u)))
+      alert(`Utilisateur ${newStatus ? 'réactivé' : 'désactivé'} avec succès`)
+    } catch (err: unknown) {
+      alert(`Échec de la ${action} : ` + getErrorMessage(err))
     }
   }
 
@@ -234,10 +290,11 @@ export default function Settings(): React.ReactElement {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2 font-medium transition-colors border-b-2 ${activeTab === tab.id
-              ? 'border-primary text-primary'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
-              }`}
+            className={`px-4 py-2 font-medium transition-colors border-b-2 ${
+              activeTab === tab.id
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
           >
             {tab.label}
           </button>
@@ -656,24 +713,61 @@ export default function Settings(): React.ReactElement {
                     key={user.id}
                     className="p-4 bg-card rounded-lg border border-border shadow-sm flex justify-between items-center"
                   >
-                    <div>
-                      <h3 className="font-semibold">{user.full_name || 'Sans Nom'}</h3>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold">{user.full_name || 'Sans Nom'}</h3>
+                        <span
+                          className={clsx(
+                            'text-[10px] px-1.5 py-0.5 rounded-full font-medium uppercase',
+                            user.active
+                              ? 'bg-green-100 text-green-700 border border-green-200'
+                              : 'bg-red-100 text-red-700 border border-red-200'
+                          )}
+                        >
+                          {user.active ? 'Actif' : 'Inactif'}
+                        </span>
+                      </div>
                       <p className="text-sm text-muted-foreground">{user.id}</p>
                       <p className="text-xs text-muted-foreground mt-1">Rôle: {user.role}</p>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleToggleUserStatus(user.id, user.active)}
+                        className={clsx(
+                          'p-2 transition-colors rounded-md',
+                          user.active
+                            ? 'text-amber-600 hover:bg-amber-50'
+                            : 'text-green-600 hover:bg-green-50'
+                        )}
+                        title={user.active ? 'Désactiver' : 'Réactiver'}
+                        disabled={user.id === profile?.id}
+                      >
+                        {user.active ? (
+                          <UserMinus className="w-4 h-4" />
+                        ) : (
+                          <UserCheck className="w-4 h-4" />
+                        )}
+                      </button>
                       <button
                         onClick={() => {
                           setEditingUser(user)
                           setIsUserModalOpen(true)
                         }}
-                        className="p-2 text-muted-foreground hover:text-primary transition-colors"
+                        className="p-2 text-muted-foreground hover:text-primary hover:bg-secondary transition-colors rounded-md"
                         title="Modifier"
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
+                      <button
+                        onClick={() => handleDeleteUser(user.id)}
+                        className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors rounded-md"
+                        title="Supprimer"
+                        disabled={user.id === profile?.id}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                       {user.id === profile?.id && (
-                        <span className="text-xs text-muted-foreground">(Vous)</span>
+                        <span className="text-xs text-muted-foreground ml-2">(Vous)</span>
                       )}
                     </div>
                   </div>

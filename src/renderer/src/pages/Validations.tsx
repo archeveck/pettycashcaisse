@@ -112,6 +112,19 @@ id,
 
       if (error) throw error
 
+      // Send Email Notification
+      supabase.functions
+        .invoke('send-email', {
+          body: {
+            type: 'validation',
+            requestId: id,
+            action: action // 'approve' or 'reject'
+          }
+        })
+        .catch((err) => console.error('Failed to send email notification:', err))
+
+      if (error) throw error
+
       // Show success notification
       if (action === 'approve') {
         showNotification('Demande approuvée avec succès !', 'success')
@@ -139,7 +152,23 @@ id,
         rejection_reason: reason
       }
 
-      const { error } = await supabase.from('cash_requests').update(updates).eq('id', requestToReject)
+      const { error } = await supabase
+        .from('cash_requests')
+        .update(updates)
+        .eq('id', requestToReject)
+
+      if (error) throw error
+
+      // Send Email Notification
+      supabase.functions
+        .invoke('send-email', {
+          body: {
+            type: 'validation',
+            requestId: requestToReject,
+            action: 'reject'
+          }
+        })
+        .catch((err) => console.error('Failed to send email notification:', err))
 
       if (error) throw error
 

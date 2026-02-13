@@ -5,8 +5,8 @@ Ce guide vous explique comment déployer l'instance Supabase sur votre serveur l
 ## Prérequis sur le Serveur
 
 1.  **Docker** et **Docker Compose** doivent être installés.
-    *   [Installer Docker Desktop sur Mac/Windows](https://www.docker.com/products/docker-desktop)
-    *   [Installer Docker Engine sur Linux](https://docs.docker.com/engine/install/)
+    - [Installer Docker Desktop sur Mac/Windows](https://www.docker.com/products/docker-desktop)
+    - [Installer Docker Engine sur Linux](https://docs.docker.com/engine/install/)
 
 ## Étape 1 : Préparation de la Configuration
 
@@ -15,11 +15,12 @@ Ce guide vous explique comment déployer l'instance Supabase sur votre serveur l
 3.  **IMPORTANT** : Remplacez `localhost` par l'adresse IP de votre serveur pour que l'API soit accessible depuis d'autres machines du réseau.
 
     Modifiez les lignes suivantes :
+
     ```dotenv
     # Remplacez 192.168.x.x par l'adresse IP réelle de votre serveur
     SUPABASE_PUBLIC_URL=http://192.168.x.x:8000
     API_EXTERNAL_URL=http://192.168.x.x:8000
-    
+
     # Pour le lien du Studio (Dashboard)
     SITE_URL=http://192.168.x.x:3000
     ```
@@ -33,11 +34,13 @@ cd supabase
 docker-compose up -d
 ```
 
--   L'option `-d` lance les conteneurs en tâche de fond (détaché).
--   La première fois, cela peut prendre quelques minutes pour télécharger les images Docker.
+- L'option `-d` lance les conteneurs en tâche de fond (détaché).
+- La première fois, cela peut prendre quelques minutes pour télécharger les images Docker.
 
 ### Vérification
+
 Assurez-vous que tous les conteneurs sont "Up" (en cours d'exécution) :
+
 ```bash
 docker-compose ps
 ```
@@ -47,8 +50,8 @@ docker-compose ps
 Ouvrez votre navigateur et allez à l'adresse :
 `http://<IP_DU_SERVEUR>:3000` (ex: `http://192.168.1.50:3000`)
 
--   **Projet** : `default`
--   **Organisation** : `supabase`
+- **Projet** : `default`
+- **Organisation** : `supabase`
 
 ## Étape 4 : Configuration de l'Application Electron
 
@@ -70,6 +73,6 @@ VITE_SUPABASE_ANON_KEY=votre_cle_copiee_depuis_supabase_env
 
 ## Résolution de problèmes courants
 
--   **Conflit de ports** : Si le port 5432 (Postgres) ou 8000 (API) est déjà utilisé, modifiez les ports dans `docker-compose.yml` et `.env`.
--   **Base de données non initialisée** : Le fichier `supabase_schema.sql` est monté automatiquement. S'il ne se charge pas, vous pouvez le copier/coller dans l'éditeur SQL du Supabase Studio (`http://<IP>:3000/project/default/sql`).
--   **Accès réseau** : Vérifiez que le pare-feu du serveur autorise les connexions entrantes sur les ports 8000 (API) et 3000 (Studio).
+- **Conflit de ports** : Si le port 5432 (Postgres) ou 8000 (API) est déjà utilisé, modifiez les ports dans `docker-compose.yml` et `.env`.
+- **Base de données non initialisée** : Le fichier `supabase_schema.sql` est monté automatiquement. S'il ne se charge pas, vous pouvez le copier/coller dans l'éditeur SQL du Supabase Studio (`http://<IP>:3000/project/default/sql`).
+- **Accès réseau** : Vérifiez que le pare-feu du serveur autorise les connexions entrantes sur les ports 8000 (API) et 3000 (Studio).
