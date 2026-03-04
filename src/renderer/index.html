@@ -6,7 +6,7 @@
   <title>PettyCash</title>
   <!-- https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP -->
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://*.supabase.co http://estiasynergie.ddns.net:8000 http://odooestia.ddns.net:8070; connect-src 'self' https://*.supabase.co wss://*.supabase.co http://estiasynergie.ddns.net:8000 ws://estiasynergie.ddns.net:8000 http://odooestia.ddns.net:8070 ws://odooestia.ddns.net:8070" />
+    content="default-src 'self'; script-src 'self' blob:; worker-src 'self' blob:; frame-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://*.supabase.co http://estiasynergie.ddns.net:8000 http://odooestia.ddns.net:8070; connect-src 'self' https://*.supabase.co wss://*.supabase.co http://estiasynergie.ddns.net:8000 ws://estiasynergie.ddns.net:8000 http://odooestia.ddns.net:8070 ws://odooestia.ddns.net:8070 ws://localhost:*" />
 </head>
 
 <body>

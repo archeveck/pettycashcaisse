@@ -303,9 +303,10 @@ export default function Transactions(): React.ReactElement {
             onClick={handlePrintAll}
             disabled={transactions.filter((t) => t.type === 'outflow').length === 0}
             className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50"
+            title="Génère un PDF fusionné de toutes les sorties avec leurs justificatifs, puis ouvre l'impression"
           >
-            <Printer className="w-4 h-4" />
-            Imprimer Tout (Sorties)
+            <FileText className="w-4 h-4" />
+            Fusionner & Imprimer (Sorties)
           </button>
         )}
       </div>
