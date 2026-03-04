@@ -1,10 +1,9 @@
-
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
 }
 
 interface EmailRequest {
@@ -24,16 +23,18 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { type, requestId, action } = await req.json() as EmailRequest
+    const { type, requestId, action } = (await req.json()) as EmailRequest
 
     // 1. Fetch Request Details
     const { data: request, error: requestError } = await supabaseClient
       .from('cash_requests')
-      .select(`
+      .select(
+        `
         *,
         requester:profiles!requester_id(full_name),
         analytical_account:analytical_accounts(code, name, project:projects(name))
-      `)
+      `
+      )
       .eq('id', requestId)
       .single()
 
@@ -53,7 +54,7 @@ serve(async (req) => {
         .from('profiles')
         .select('id')
         .eq('role', 'controller')
-      
+
       if (controllers) {
         for (const c of controllers) {
           const { data: user } = await supabaseClient.auth.admin.getUserById(c.id)
@@ -74,7 +75,9 @@ serve(async (req) => {
       `
     } else if (type === 'validation') {
       // Notify Requester
-      const { data: requesterUser } = await supabaseClient.auth.admin.getUserById(request.requester_id)
+      const { data: requesterUser } = await supabaseClient.auth.admin.getUserById(
+        request.requester_id
+      )
       if (requesterUser.user?.email) recipients.push(requesterUser.user.email)
 
       if (action === 'approve') {
@@ -89,12 +92,12 @@ serve(async (req) => {
           .from('profiles')
           .select('id')
           .eq('role', 'cashier')
-        
+
         if (cashiers) {
-            for (const c of cashiers) {
-                const { data: user } = await supabaseClient.auth.admin.getUserById(c.id)
-                if (user.user?.email) recipients.push(user.user.email)
-            }
+          for (const c of cashiers) {
+            const { data: user } = await supabaseClient.auth.admin.getUserById(c.id)
+            if (user.user?.email) recipients.push(user.user.email)
+          }
         }
       } else if (action === 'reject') {
         subject = `[PettyCash] Demande Rejetée`
@@ -110,7 +113,7 @@ serve(async (req) => {
       const hostname = 'postfix'
       const port = 25
       const conn = await Deno.connect({ hostname, port })
-      
+
       const encoder = new TextEncoder()
       const decoder = new TextDecoder()
       const buffer = new Uint8Array(1024)
@@ -118,14 +121,14 @@ serve(async (req) => {
       const write = async (cmd: string) => {
         await conn.write(encoder.encode(cmd + '\r\n'))
         // Assume success for simplicity in this script, or read response
-        await conn.read(buffer) 
+        await conn.read(buffer)
       }
 
       // Simple SMTP sequence
       // Note: This sends one email per recipient individually or uses BCC logic.
       // For simplicity, we loop through recipients and send individualized emails or just one with TO.
-      // Let's send to each recipient to avoid exposing emails to each other if that's a concern, 
-      // but for internal notifications, a single email is often fine. 
+      // Let's send to each recipient to avoid exposing emails to each other if that's a concern,
+      // but for internal notifications, a single email is often fine.
       // We will loop to be safe.
 
       for (const email of recipients) {
@@ -148,13 +151,12 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ success: true, recipients }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
+      status: 200
     })
-
   } catch (error) {
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 400,
+      status: 400
     })
   }
 })

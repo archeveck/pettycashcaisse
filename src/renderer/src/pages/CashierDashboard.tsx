@@ -26,6 +26,7 @@ interface Transaction {
   description: string
   date: string
   proof_document_url: string | null
+  change_amount?: number
   request_id?: string
   request?: {
     id: string
@@ -82,6 +83,12 @@ export default function CashierDashboard(): React.ReactElement {
   // Upload state
   const [isUploadingProof, setIsUploadingProof] = useState<string | null>(null)
   const [voucherData, setVoucherData] = useState<VoucherData | null>(null)
+
+  // Return change modal state
+  const [isReturnChangeModalOpen, setIsReturnChangeModalOpen] = useState(false)
+  const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null)
+  const [changeAmount, setChangeAmount] = useState(0)
+  const [isProcessingReturnChange, setIsProcessingReturnChange] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -140,6 +147,7 @@ export default function CashierDashboard(): React.ReactElement {
           description,
           date,
           proof_document_url,
+          change_amount,
           request_id,
           request:cash_requests (
             id,
@@ -166,13 +174,15 @@ export default function CashierDashboard(): React.ReactElement {
       // For MVP, let's just sum inflows - outflows
       const { data: transactions, error: transError } = await supabase
         .from('cash_transactions')
-        .select('type, amount')
+        .select('type, amount, change_amount')
 
       if (transError) throw transError
 
       const currentBalance =
         transactions?.reduce((acc, curr) => {
-          return curr.type === 'inflow' ? acc + curr.amount : acc - curr.amount
+          const amount = curr.amount
+          const change = curr.change_amount || 0
+          return curr.type === 'inflow' ? acc + amount : acc - amount + change
         }, 0) || 0
 
       setBalance(currentBalance)
@@ -203,6 +213,36 @@ export default function CashierDashboard(): React.ReactElement {
     }
   }
 
+  const handleReturnChange = async (): Promise<void> => {
+    if (!selectedTransactionId || changeAmount < 0) return
+    setIsProcessingReturnChange(true)
+    try {
+      const { error } = await supabase
+        .from('cash_transactions')
+        .update({ change_amount: changeAmount })
+        .eq('id', selectedTransactionId)
+
+      if (error) throw error
+
+      showNotification('Retour monnaie enregistré avec succès !', 'success')
+      setIsReturnChangeModalOpen(false)
+      setSelectedTransactionId(null)
+      setChangeAmount(0)
+      fetchData()
+    } catch (err: unknown) {
+      console.error('Error recording return change:', err)
+      showNotification(`Échec de l'enregistrement du retour monnaie: ${getErrorMessage(err)}`, 'error')
+    } finally {
+      setIsProcessingReturnChange(false)
+    }
+  }
+
+  const openReturnChangeModal = (transaction: Transaction): void => {
+    setSelectedTransactionId(transaction.id)
+    setChangeAmount(transaction.change_amount || 0)
+    setIsReturnChangeModalOpen(true)
+  }
+
   const handlePrintVoucher = (transaction: Transaction): void => {
     if (transaction.type === 'outflow' && transaction.request) {
       setVoucherData({
@@ -212,7 +252,8 @@ export default function CashierDashboard(): React.ReactElement {
         amount: transaction.amount,
         description: transaction.description,
         analyticalAccount: transaction.request.analytical_account,
-        cashierName: profile?.full_name
+        cashierName: profile?.full_name,
+        proof_document_url: transaction.proof_document_url
       })
     }
   }
@@ -524,6 +565,21 @@ export default function CashierDashboard(): React.ReactElement {
                           Imprimer
                         </button>
                       )}
+                      {t.type === 'outflow' && (
+                        <button
+                          onClick={() => openReturnChangeModal(t)}
+                          className={`mt-2 inline-flex items-center gap-1 px-2 py-1 text-[10px] rounded transition-colors ${t.change_amount && t.change_amount > 0
+                            ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                            : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                            }`}
+                          title="Gérer le retour monnaie"
+                        >
+                          <DollarSign className="w-3 h-3" />
+                          {t.change_amount && t.change_amount > 0
+                            ? `Retour: ${new Intl.NumberFormat('fr-FR').format(t.change_amount)}`
+                            : 'Retour Monnaie'}
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -671,6 +727,52 @@ export default function CashierDashboard(): React.ReactElement {
                       <Plus className="w-4 h-4" />
                       Ajouter l&apos;Entrée
                     </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Return Change Modal */}
+      {isReturnChangeModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-card p-6 rounded-lg border border-border shadow-lg max-w-md w-full">
+            <h2 className="text-xl font-semibold mb-4">Retour Monnaie</h2>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Montant du retour (FCFA)</label>
+                <input
+                  type="number"
+                  value={changeAmount || ''}
+                  onChange={(e) => setChangeAmount(Number(e.target.value))}
+                  placeholder="Entrer le montant du retour"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  autoFocus
+                />
+              </div>
+              <div className="flex gap-2 justify-end pt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsReturnChangeModalOpen(false)}
+                  disabled={isProcessingReturnChange}
+                  className="px-4 py-2 border border-border rounded-md hover:bg-secondary transition-colors disabled:opacity-50"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={handleReturnChange}
+                  disabled={isProcessingReturnChange}
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"
+                >
+                  {isProcessingReturnChange ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Traitement...
+                    </>
+                  ) : (
+                    'Enregistrer le retour'
                   )}
                 </button>
               </div>

@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { supabase } from '../services/supabase'
-import { Loader2, Wallet } from 'lucide-react'
+import { Loader2, Wallet, Eye, EyeOff } from 'lucide-react'
 import { getErrorMessage } from '../utils/errorUtils'
 
 const loginSchema = z.object({
@@ -20,6 +20,7 @@ export default function Login(): React.ReactElement {
   const from = location.state?.from?.pathname || '/'
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   const {
     register,
@@ -101,13 +102,23 @@ export default function Login(): React.ReactElement {
             <label className="text-sm font-semibold text-foreground" htmlFor="password">
               Password
             </label>
-            <input
-              id="password"
-              type="password"
-              className="flex h-12 w-full rounded-xl border border-input bg-background/50 backdrop-blur-sm px-4 py-3 text-sm ring-offset-background transition-all duration-200 placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:border-primary disabled:cursor-not-allowed disabled:opacity-50 hover:border-primary/50"
-              placeholder="••••••••"
-              {...register('password')}
-            />
+            <div className="relative">
+              <input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                className="flex h-12 w-full rounded-xl border border-input bg-background/50 backdrop-blur-sm px-4 py-3 text-sm ring-offset-background transition-all duration-200 placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:border-primary disabled:cursor-not-allowed disabled:opacity-50 hover:border-primary/50 pr-12"
+                placeholder="••••••••"
+                {...register('password')}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
+            </div>
             {errors.password && (
               <p className="text-sm text-destructive animate-in fade-in slide-in-from-top-1 duration-200">
                 {errors.password.message}

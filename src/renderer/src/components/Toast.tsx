@@ -42,7 +42,7 @@ const typeConfig = {
   }
 }
 
-export default function Toast({ id, message, type, onClose, duration = 5000 }: ToastProps) {
+export default function Toast({ id, message, type, onClose, duration = 300000 }: ToastProps): React.ReactElement {
   const config = typeConfig[type]
   const Icon = config.icon
 

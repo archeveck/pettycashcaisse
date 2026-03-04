@@ -2,8 +2,9 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import { updateService } from './updateService'
 
-function createWindow(): void {
+function createWindow(): BrowserWindow {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
     width: 900,
@@ -33,6 +34,8 @@ function createWindow(): void {
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+
+  return mainWindow
 }
 
 // This method will be called when Electron has finished
@@ -79,7 +82,12 @@ app.whenReady().then(() => {
     }
   })
 
-  createWindow()
+  // Créer la fenêtre principale
+  const mainWindow = createWindow()
+
+  // Initialiser le service de mise à jour
+  updateService.setMainWindow(mainWindow)
+  updateService.setupIpcHandlers()
 
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the
@@ -92,6 +100,9 @@ app.whenReady().then(() => {
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
+  // Nettoyer le service de mise à jour
+  updateService.cleanup()
+
   if (process.platform !== 'darwin') {
     app.quit()
   }

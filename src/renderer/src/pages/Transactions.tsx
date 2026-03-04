@@ -9,11 +9,15 @@ import {
   Calendar,
   FileText,
   Upload,
-  CheckCircle2
+  CheckCircle2,
+  Printer,
+  DollarSign
 } from 'lucide-react'
 import { useNotification } from '../contexts/NotificationContext'
 import { getErrorMessage } from '../utils/errorUtils'
 import { uploadTransactionProof } from '../services/transactionService'
+import { getProjects, getAnalyticalAccounts, Project, AnalyticalAccount } from '../services/settingsService'
+import CashVoucher, { VoucherData, BulkPrintData } from '../components/CashVoucher'
 import { format } from 'date-fns'
 
 interface Transaction {
@@ -24,6 +28,7 @@ interface Transaction {
   date: string
   proof_document_url: string | null
   proof_submitted_at: string | null
+  change_amount?: number
   created_by: string
   creator?: {
     full_name: string
@@ -40,6 +45,7 @@ interface Transaction {
     project: {
       name: string
     }
+    project_id?: string
   }
 }
 
@@ -52,8 +58,19 @@ export default function Transactions(): React.ReactElement {
   const [typeFilter, setTypeFilter] = useState<'all' | 'inflow' | 'outflow'>('all')
   const [isUploadingProof, setIsUploadingProof] = useState<string | null>(null)
   const [showMissingProof, setShowMissingProof] = useState(false)
+  const [projects, setProjects] = useState<Project[]>([])
+  const [accounts, setAccounts] = useState<AnalyticalAccount[]>([])
+  const [selectedProject, setSelectedProject] = useState('')
+  const [selectedAccount, setSelectedAccount] = useState('')
+  const [printData, setPrintData] = useState<VoucherData | BulkPrintData | null>(null)
   const [searchParams] = useSearchParams()
   const { showNotification } = useNotification()
+
+  // Return change modal state
+  const [isReturnChangeModalOpen, setIsReturnChangeModalOpen] = useState(false)
+  const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null)
+  const [changeAmount, setChangeAmount] = useState(0)
+  const [isProcessingReturnChange, setIsProcessingReturnChange] = useState(false)
 
   useEffect(() => {
     const end = new Date()
@@ -69,13 +86,25 @@ export default function Transactions(): React.ReactElement {
 
     setStartDate(start.toISOString().split('T')[0])
     setEndDate(end.toISOString().split('T')[0])
+
+    // Fetch filter data
+    const loadFilterData = async (): Promise<void> => {
+      try {
+        const [projData, accData] = await Promise.all([getProjects(), getAnalyticalAccounts()])
+        setProjects(projData)
+        setAccounts(accData)
+      } catch (err) {
+        console.error('Error loading filter data:', err)
+      }
+    }
+    loadFilterData()
   }, [searchParams])
 
   useEffect(() => {
     if (startDate && endDate && profile) {
       fetchTransactions()
     }
-  }, [startDate, endDate, typeFilter, showMissingProof, profile])
+  }, [startDate, endDate, typeFilter, showMissingProof, selectedProject, selectedAccount, profile])
 
   const fetchTransactions = async (): Promise<void> => {
     if (!profile) return
@@ -99,6 +128,7 @@ export default function Transactions(): React.ReactElement {
           analytical_account:analytical_accounts (
             code,
             name,
+            project_id,
             project:projects (
               name
             )
@@ -116,6 +146,10 @@ export default function Transactions(): React.ReactElement {
 
       if (showMissingProof) {
         query = query.eq('type', 'outflow').is('proof_document_url', null)
+      }
+
+      if (selectedAccount) {
+        query = query.eq('analytical_account_id', selectedAccount)
       }
 
       // For requesters, only show their own transactions (outflows from their requests)
@@ -142,7 +176,13 @@ export default function Transactions(): React.ReactElement {
 
       if (error) throw error
 
-      setTransactions(data as unknown as Transaction[])
+      let filtered = data as unknown as Transaction[]
+
+      if (selectedProject) {
+        filtered = filtered.filter((t) => t.analytical_account?.project_id === selectedProject)
+      }
+
+      setTransactions(filtered)
     } catch (err) {
       console.error('Error fetching transactions:', err)
     } finally {
@@ -166,6 +206,36 @@ export default function Transactions(): React.ReactElement {
     }
   }
 
+  const handleReturnChange = async (): Promise<void> => {
+    if (!selectedTransactionId || changeAmount < 0) return
+    setIsProcessingReturnChange(true)
+    try {
+      const { error } = await supabase
+        .from('cash_transactions')
+        .update({ change_amount: changeAmount })
+        .eq('id', selectedTransactionId)
+
+      if (error) throw error
+
+      showNotification('Retour monnaie enregistré avec succès !', 'success')
+      setIsReturnChangeModalOpen(false)
+      setSelectedTransactionId(null)
+      setChangeAmount(0)
+      fetchTransactions()
+    } catch (err: unknown) {
+      console.error('Error recording return change:', err)
+      showNotification(`Échec de l'enregistrement du retour monnaie: ${getErrorMessage(err)}`, 'error')
+    } finally {
+      setIsProcessingReturnChange(false)
+    }
+  }
+
+  const openReturnChangeModal = (transaction: Transaction): void => {
+    setSelectedTransactionId(transaction.id)
+    setChangeAmount(transaction.change_amount || 0)
+    setIsReturnChangeModalOpen(true)
+  }
+
   // Calculate totals
   const totalInflows = transactions
     .filter((t) => t.type === 'inflow')
@@ -173,18 +243,77 @@ export default function Transactions(): React.ReactElement {
 
   const totalOutflows = transactions
     .filter((t) => t.type === 'outflow')
-    .reduce((sum, t) => sum + t.amount, 0)
+    .reduce((sum, t) => sum + (t.amount - (t.change_amount || 0)), 0)
 
   const netBalance = totalInflows - totalOutflows
 
+  const handlePrintIndividual = (t: Transaction): void => {
+    const data: VoucherData = {
+      transactionId: t.id,
+      date: t.date,
+      requesterName: t.request?.requester.full_name || t.creator?.full_name || 'N/A',
+      amount: t.amount,
+      description: t.description,
+      analyticalAccount: {
+        code: t.analytical_account?.code || 'N/A',
+        name: t.analytical_account?.name || 'N/A',
+        project: {
+          name: t.analytical_account?.project?.name || 'N/A'
+        }
+      },
+      cashierName: t.creator?.full_name,
+      proof_document_url: t.proof_document_url
+    }
+    setPrintData(data)
+  }
+
+  const handlePrintAll = (): void => {
+    const inflows = transactions.filter((t) => t.type === 'outflow')
+    if (inflows.length === 0) {
+      showNotification('Aucune transaction de sortie à imprimer.', 'info')
+      return
+    }
+
+    const vouchers: VoucherData[] = inflows.map((t) => ({
+      transactionId: t.id,
+      date: t.date,
+      requesterName: t.request?.requester.full_name || t.creator?.full_name || 'N/A',
+      amount: t.amount,
+      description: t.description,
+      analyticalAccount: {
+        code: t.analytical_account?.code || 'N/A',
+        name: t.analytical_account?.name || 'N/A',
+        project: {
+          name: t.analytical_account?.project?.name || 'N/A'
+        }
+      },
+      cashierName: t.creator?.full_name,
+      proof_document_url: t.proof_document_url
+    }))
+
+    setPrintData({ vouchers })
+  }
+
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold tracking-tight">Transactions de Caisse</h1>
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold tracking-tight">Transactions de Caisse</h1>
+        {['admin', 'cashier'].includes(profile?.role || '') && (
+          <button
+            onClick={handlePrintAll}
+            disabled={transactions.filter((t) => t.type === 'outflow').length === 0}
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50"
+          >
+            <Printer className="w-4 h-4" />
+            Imprimer Tout (Sorties)
+          </button>
+        )}
+      </div>
 
       {/* Filters */}
       <div className="p-4 bg-card rounded-lg border border-border shadow-sm">
         <h3 className="font-semibold mb-3">Filtres</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <div className="space-y-2">
             <label className="text-sm font-medium">Date de Début</label>
             <input
@@ -227,6 +356,42 @@ export default function Transactions(): React.ReactElement {
                 Justificatifs Manquants Uniquement
               </span>
             </label>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Projet</label>
+            <select
+              value={selectedProject}
+              onChange={(e) => {
+                setSelectedProject(e.target.value)
+                setSelectedAccount('')
+              }}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              <option value="">Tous les projets</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Compte Analytique</label>
+            <select
+              value={selectedAccount}
+              onChange={(e) => setSelectedAccount(e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              <option value="">Tous les comptes</option>
+              {(selectedProject
+                ? accounts.filter((a) => a.project_id === selectedProject)
+                : accounts
+              ).map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.code} - {a.name}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       </div>
@@ -301,7 +466,7 @@ export default function Transactions(): React.ReactElement {
                     </>
                   )}
                   {profile?.role === 'requester' && <th className="pb-3 font-medium">Statut</th>}
-                  <th className="pb-3 font-medium">Justificatif</th>
+                  <th className="pb-3 font-medium text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -315,11 +480,10 @@ export default function Transactions(): React.ReactElement {
                     </td>
                     <td className="py-3">
                       <span
-                        className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${
-                          t.type === 'inflow'
-                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                            : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                        }`}
+                        className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${t.type === 'inflow'
+                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                          : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                          }`}
                       >
                         {t.type === 'inflow' ? (
                           <TrendingUp className="w-3 h-3" />
@@ -364,8 +528,29 @@ export default function Transactions(): React.ReactElement {
                         </span>
                       </td>
                     )}
-                    <td className="py-3">
-                      {t.type === 'outflow' && (
+                    <td className="py-3 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        {t.type === 'outflow' && (
+                          <button
+                            onClick={() => handlePrintIndividual(t)}
+                            className="p-1 text-primary hover:bg-primary/10 rounded transition-colors"
+                            title="Imprimer la pièce de caisse"
+                          >
+                            <Printer className="w-4 h-4" />
+                          </button>
+                        )}
+                        {t.type === 'outflow' && ['admin', 'cashier'].includes(profile?.role || '') && (
+                          <button
+                            onClick={() => openReturnChangeModal(t)}
+                            className={`flex items-center gap-1 px-2 py-1 text-[10px] rounded transition-colors whitespace-nowrap ${t.change_amount && t.change_amount > 0 ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-blue-100 text-blue-700 hover:bg-blue-100'}`}
+                            title="Gérer le retour monnaie"
+                          >
+                            <DollarSign className="w-3 h-3" />
+                            {t.change_amount && t.change_amount > 0
+                              ? `${new Intl.NumberFormat('fr-FR').format(t.change_amount)}`
+                              : 'Retour'}
+                          </button>
+                        )}
                         <div className="flex items-center gap-2">
                           {t.proof_document_url ? (
                             <a
@@ -375,12 +560,12 @@ export default function Transactions(): React.ReactElement {
                               className="text-xs text-blue-600 hover:underline flex items-center gap-1"
                             >
                               <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
-                              Voir
+                              Voir Justif
                             </a>
-                          ) : (
+                          ) : t.type === 'outflow' ? (
                             <>
                               <span className="text-xs text-yellow-600 font-medium whitespace-nowrap">
-                                ⚠ Manquant
+                                ⚠ Pas de Justif
                               </span>
                               {['admin', 'cashier'].includes(profile?.role || '') && (
                                 <label
@@ -407,9 +592,11 @@ export default function Transactions(): React.ReactElement {
                                 </label>
                               )}
                             </>
+                          ) : (
+                            <span className="text-xs text-muted-foreground italic">Entrée</span>
                           )}
                         </div>
-                      )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -418,6 +605,55 @@ export default function Transactions(): React.ReactElement {
           </div>
         )}
       </div>
+      {printData && (
+        <CashVoucher data={printData} onClose={() => setPrintData(null)} />
+      )}
+
+      {/* Return Change Modal */}
+      {isReturnChangeModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-card p-6 rounded-lg border border-border shadow-lg max-w-md w-full">
+            <h2 className="text-xl font-semibold mb-4">Retour Monnaie</h2>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Montant du retour (FCFA)</label>
+                <input
+                  type="number"
+                  value={changeAmount || ''}
+                  onChange={(e) => setChangeAmount(Number(e.target.value))}
+                  placeholder="Entrer le montant du retour"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  autoFocus
+                />
+              </div>
+              <div className="flex gap-2 justify-end pt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsReturnChangeModalOpen(false)}
+                  disabled={isProcessingReturnChange}
+                  className="px-4 py-2 border border-border rounded-md hover:bg-secondary transition-colors disabled:opacity-50"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={handleReturnChange}
+                  disabled={isProcessingReturnChange}
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"
+                >
+                  {isProcessingReturnChange ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Traitement...
+                    </>
+                  ) : (
+                    'Enregistrer le retour'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -6,7 +6,11 @@ services:
     image: supabase/studio:20250113-6447c23
     restart: unless-stopped
     healthcheck:
-      test: [ 'CMD-SHELL', 'wget --no-verbose --spider --tries=1 --timeout=5 http://localhost:3000/api/profile || exit 1' ]
+      test:
+        [
+          'CMD-SHELL',
+          'wget --no-verbose --spider --tries=1 --timeout=5 http://localhost:3000/api/profile || exit 1'
+        ]
       interval: 5s
       timeout: 5s
       retries: 3
@@ -54,7 +58,11 @@ services:
     image: supabase/gotrue:v2.132.3
     restart: unless-stopped
     healthcheck:
-      test: [ 'CMD-SHELL', 'wget --no-verbose --spider --tries=1 --timeout=5 http://localhost:9999/health || exit 1' ]
+      test:
+        [
+          'CMD-SHELL',
+          'wget --no-verbose --spider --tries=1 --timeout=5 http://localhost:9999/health || exit 1'
+        ]
       interval: 5s
       timeout: 5s
       retries: 3
@@ -86,7 +94,7 @@ services:
     image: postgrest/postgrest:v12.2.0
     restart: unless-stopped
     healthcheck:
-      test: [ 'CMD-SHELL', 'head -n 1 /dev/tcp/127.0.0.1/3000 || exit 1' ]
+      test: ['CMD-SHELL', 'head -n 1 /dev/tcp/127.0.0.1/3000 || exit 1']
       interval: 5s
       timeout: 5s
       retries: 3
@@ -104,7 +112,7 @@ services:
     image: supabase/realtime:v2.33.58
     restart: unless-stopped
     healthcheck:
-      test: [ 'CMD-SHELL', "bash -c ':> /dev/tcp/127.0.0.1/4000' || exit 1" ]
+      test: ['CMD-SHELL', "bash -c ':> /dev/tcp/127.0.0.1/4000' || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 3
@@ -131,7 +139,11 @@ services:
     image: supabase/storage-api:v1.11.13
     restart: unless-stopped
     healthcheck:
-      test: [ 'CMD-SHELL', 'wget --no-verbose --spider --tries=1 --timeout=5 http://localhost:5000/status || exit 1' ]
+      test:
+        [
+          'CMD-SHELL',
+          'wget --no-verbose --spider --tries=1 --timeout=5 http://localhost:5000/status || exit 1'
+        ]
       interval: 5s
       timeout: 5s
       retries: 3
@@ -159,7 +171,7 @@ services:
     image: darthsim/imgproxy:v3.26.0
     restart: unless-stopped
     healthcheck:
-      test: [ 'CMD-SHELL', 'head -n 1 /dev/tcp/127.0.0.1/8080 || exit 1' ]
+      test: ['CMD-SHELL', 'head -n 1 /dev/tcp/127.0.0.1/8080 || exit 1']
       interval: 5s
       timeout: 5s
       retries: 3
@@ -181,7 +193,11 @@ services:
     image: supabase/postgres-meta:v0.84.2
     restart: unless-stopped
     healthcheck:
-      test: [ 'CMD-SHELL', 'wget --no-verbose --spider --tries=1 --timeout=5 http://localhost:8080/health || exit 1' ]
+      test:
+        [
+          'CMD-SHELL',
+          'wget --no-verbose --spider --tries=1 --timeout=5 http://localhost:8080/health || exit 1'
+        ]
       interval: 5s
       timeout: 5s
       retries: 3
@@ -218,7 +234,7 @@ services:
     image: supabase/postgres:15.6.1.141
     restart: unless-stopped
     healthcheck:
-      test: [ 'CMD-SHELL', 'pg_isready -U postgres -h 127.0.0.1' ]
+      test: ['CMD-SHELL', 'pg_isready -U postgres -h 127.0.0.1']
       interval: 5s
       timeout: 5s
       retries: 10

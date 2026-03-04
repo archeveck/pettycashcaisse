@@ -2,10 +2,18 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { useNotification } from '../contexts/NotificationContext'
 import { supabase } from '../services/supabase'
-import { Loader2, Check, X } from 'lucide-react'
+import { Loader2, Check, X, ExternalLink } from 'lucide-react'
 import { format } from 'date-fns'
 import { getErrorMessage } from '../utils/errorUtils'
 import { RejectionModal } from '../components/RejectionModal'
+import { SearchableSelect } from '../components/SearchableSelect'
+import { Edit2, RotateCcw } from 'lucide-react'
+import {
+  getAnalyticalAccounts,
+  AnalyticalAccount,
+  getProjects,
+  Project
+} from '../services/settingsService'
 
 interface CashRequest {
   id: string
@@ -17,12 +25,18 @@ interface CashRequest {
     full_name: string
   }
   analytical_account: {
+    id: string
     code: string
     name: string
     project: {
+      id: string
       name: string
     }
   }
+  supplier?: {
+    name: string
+  } | null
+  proof_document_url?: string | null
 }
 
 export default function Validations(): React.ReactElement {
@@ -33,6 +47,13 @@ export default function Validations(): React.ReactElement {
   const [processingId, setProcessingId] = useState<string | null>(null)
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false)
   const [requestToReject, setRequestToReject] = useState<string | null>(null)
+
+  // Edit mode state
+  const [editingRequestId, setEditingRequestId] = useState<string | null>(null)
+  const [modifiedAccountId, setModifiedAccountId] = useState<string | null>(null)
+  const [modifiedProjectId, setModifiedProjectId] = useState<string | null>(null)
+  const [allAccounts, setAllAccounts] = useState<AnalyticalAccount[]>([])
+  const [allProjects, setAllProjects] = useState<Project[]>([])
 
   const fetchPendingRequests = useCallback(async (): Promise<void> => {
     if (!profile) return
@@ -53,16 +74,20 @@ id,
     description,
     status,
     created_at,
+    proof_document_url,
     requester: profiles(
         full_name
     ),
         analytical_account: analytical_accounts(
+            id,
             code,
             name,
             project: projects(
+                id,
                 name
             )
-        )
+        ),
+        supplier: suppliers(name)
             `
         )
         .eq('status', targetStatus)
@@ -79,7 +104,18 @@ id,
 
   useEffect(() => {
     fetchPendingRequests()
+    loadAccounts()
   }, [fetchPendingRequests])
+
+  const loadAccounts = async (): Promise<void> => {
+    try {
+      const [accounts, projects] = await Promise.all([getAnalyticalAccounts(), getProjects()])
+      setAllAccounts(accounts)
+      setAllProjects(projects)
+    } catch (err) {
+      console.error('Error loading accounts and projects:', err)
+    }
+  }
 
   const handleAction = async (id: string, action: 'approve' | 'reject'): Promise<void> => {
     if (!profile) return
@@ -106,6 +142,11 @@ id,
             cfo_approval_at: new Date().toISOString()
           }
         }
+      }
+
+      // Include modified analytical account if changed
+      if (editingRequestId === id && modifiedAccountId) {
+        updates.analytical_account_id = modifiedAccountId
       }
 
       const { error } = await supabase.from('cash_requests').update(updates).eq('id', id)
@@ -210,11 +251,100 @@ id,
                   </span>
                 </div>
                 <p className="text-muted-foreground">{request.description}</p>
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="bg-secondary px-2 py-1 rounded text-secondary-foreground">
-                    {request.analytical_account.project.name} / {request.analytical_account.code}
-                  </span>
+                <div className="flex flex-col gap-2">
+                  {request.supplier && (
+                    <div className="flex items-center gap-2 text-sm text-purple-600 font-medium">
+                      <span>Fournisseur: {request.supplier.name}</span>
+                    </div>
+                  )}
+                  {editingRequestId === request.id ? (
+                    <div className="flex flex-col gap-3 p-3 bg-secondary/30 rounded-lg">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-muted-foreground uppercase">
+                            Modifier Projet
+                          </label>
+                          <SearchableSelect
+                            options={allProjects.map((p) => ({
+                              id: p.id,
+                              name: p.name
+                            }))}
+                            value={modifiedProjectId || request.analytical_account.project.id}
+                            onChange={(val) => {
+                              setModifiedProjectId(val)
+                              setModifiedAccountId(null) // Reset account when project changes
+                            }}
+                            placeholder="Rechercher un projet..."
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-muted-foreground uppercase">
+                            Modifier Compte Analytique
+                          </label>
+                          <SearchableSelect
+                            options={allAccounts
+                              .filter((acc) => {
+                                const projectId = modifiedProjectId || request.analytical_account.project.id
+                                return acc.project_id === projectId
+                              })
+                              .map((acc) => ({
+                                id: acc.id,
+                                name: `${acc.code} - ${acc.name}`
+                              }))}
+                            value={modifiedAccountId || request.analytical_account.id}
+                            onChange={(val) => setModifiedAccountId(val)}
+                            placeholder="Rechercher un compte..."
+                            disabled={!modifiedProjectId && !request.analytical_account.project.id}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setEditingRequestId(null)
+                            setModifiedAccountId(null)
+                            setModifiedProjectId(null)
+                          }}
+                          className="text-xs flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                        >
+                          <RotateCcw className="w-3 h-3" /> Annuler
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-sm group">
+                      <span className="bg-secondary px-2 py-1 rounded text-secondary-foreground">
+                        {request.analytical_account.project.name} / {request.analytical_account.code}
+                      </span>
+                      {profile?.role === 'controller' && (
+                        <button
+                          onClick={() => {
+                            setEditingRequestId(request.id)
+                            setModifiedAccountId(request.analytical_account.id)
+                            setModifiedProjectId(request.analytical_account.project.id)
+                          }}
+                          className="p-1 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-primary transition-all"
+                          title="Modifier le compte"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
+                {request.proof_document_url && (
+                  <div className="mt-2">
+                    <a
+                      href={request.proof_document_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      Voir le justificatif du demandeur
+                    </a>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center gap-6">
@@ -253,7 +383,8 @@ id,
             </div>
           ))}
         </div>
-      )}
+      )
+      }
 
       <RejectionModal
         isOpen={isRejectModalOpen}
@@ -264,6 +395,6 @@ id,
         onConfirm={handleRejectConfirm}
         isProcessing={!!processingId && processingId === requestToReject}
       />
-    </div>
+    </div >
   )
 }

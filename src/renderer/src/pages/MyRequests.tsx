@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../services/supabase'
-import { Loader2, Plus, Printer } from 'lucide-react'
+import { Loader2, Plus, Printer, Upload, CheckCircle2 } from 'lucide-react'
 import CashVoucher from '../components/CashVoucher'
 import { Link } from 'react-router-dom'
 import { format } from 'date-fns'
+import { uploadRequestProof } from '../services/cashRequestService'
+import { useNotification } from '../contexts/NotificationContext'
+import { getErrorMessage } from '../utils/errorUtils'
 
 interface CashRequest {
   id: string
@@ -22,6 +25,7 @@ interface CashRequest {
       name: string
     }
   }
+  proof_document_url?: string | null
 }
 
 interface VoucherData {
@@ -42,8 +46,10 @@ interface VoucherData {
 
 export default function MyRequests(): React.ReactElement {
   const { user, profile } = useAuth()
+  const { showNotification } = useNotification()
   const [requests, setRequests] = useState<CashRequest[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isUploadingProof, setIsUploadingProof] = useState<string | null>(null)
   const [voucherData, setVoucherData] = useState<VoucherData | null>(null)
 
   useEffect(() => {
@@ -60,6 +66,7 @@ export default function MyRequests(): React.ReactElement {
             description,
             status,
             created_at,
+            proof_document_url,
             requester:profiles(full_name),
             analytical_account:analytical_accounts (
               code,
@@ -89,7 +96,22 @@ export default function MyRequests(): React.ReactElement {
     }
 
     fetchRequests()
-  }, [user])
+  }, [user, profile?.role])
+
+  const handleUpdateProof = async (requestId: string, file: File): Promise<void> => {
+    setIsUploadingProof(requestId)
+    try {
+      await uploadRequestProof(requestId, file)
+      showNotification('Justificatif ajouté avec succès !', 'success')
+      // Better to refetch to get the actual public URL
+      window.location.reload() // Simple way to refresh for now
+    } catch (err) {
+      console.error('Error uploading proof:', err)
+      showNotification(`Échec de l'ajout du justificatif: ${getErrorMessage(err)}`, 'error')
+    } finally {
+      setIsUploadingProof(null)
+    }
+  }
 
   const getStatusColor = (status: string): string => {
     switch (status) {
@@ -165,6 +187,7 @@ export default function MyRequests(): React.ReactElement {
                   <th className="px-6 py-3">Compte</th>
                   <th className="px-6 py-3">Montant</th>
                   <th className="px-6 py-3">Statut</th>
+                  <th className="px-6 py-3">Justificatif</th>
                   <th className="px-6 py-3">Actions</th>
                 </tr>
               </thead>
@@ -203,6 +226,42 @@ export default function MyRequests(): React.ReactElement {
                       >
                         {request.status.replace('_', ' ')}
                       </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col gap-2">
+                        {request.proof_document_url && (
+                          <a
+                            href={request.proof_document_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+                            Voir
+                          </a>
+                        )}
+                        <label
+                          className="cursor-pointer p-1.5 bg-primary/10 hover:bg-primary/20 text-primary rounded-md transition-colors flex items-center gap-1 text-xs w-fit"
+                          title={request.proof_document_url ? 'Modifier le justificatif' : 'Ajouter le justificatif'}
+                        >
+                          {isUploadingProof === request.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Upload className="w-3.5 h-3.5" />
+                          )}
+                          {request.proof_document_url ? 'Modifier' : 'Joindre'}
+                          <input
+                            type="file"
+                            className="hidden"
+                            accept="image/*,application/pdf"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0]
+                              if (file) handleUpdateProof(request.id, file)
+                            }}
+                            disabled={!!isUploadingProof}
+                          />
+                        </label>
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       {request.status === 'disbursed' && (

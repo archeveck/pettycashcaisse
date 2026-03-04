@@ -14,8 +14,9 @@ import {
   type Project
 } from '../services/settingsService'
 import { getErrorMessage } from '../utils/errorUtils'
-import { Loader2, Send, ArrowLeft, AlertCircle, Briefcase } from 'lucide-react'
+import { Loader2, Send, ArrowLeft, AlertCircle, Briefcase, Upload } from 'lucide-react'
 import { SearchableSelect } from '../components/SearchableSelect'
+import { uploadRequestProof } from '../services/cashRequestService'
 
 // Schema factory for the request form (dynamic based on max limit)
 const createRequestSchema = (
@@ -78,6 +79,7 @@ export default function NewRequest(): React.ReactElement {
   const [fetchError] = useState<string | null>(null)
   const [maxOutflowLimit, setMaxOutflowLimit] = useState<number>(0)
   const [isLoadingSettings, setIsLoadingSettings] = useState(true)
+  const [proofFile, setProofFile] = useState<File | null>(null)
 
   const {
     register,
@@ -187,6 +189,11 @@ export default function NewRequest(): React.ReactElement {
         .single()
 
       if (error) throw error
+
+      // Upload proof document if provided
+      if (proofFile && requestRes) {
+        await uploadRequestProof(requestRes.id, proofFile)
+      }
 
       // Notify Controller
       supabase.functions
@@ -378,6 +385,37 @@ export default function NewRequest(): React.ReactElement {
                 {errors.description.message}
               </p>
             )}
+          </div>
+
+          {/* Attachment Field */}
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-foreground flex items-center gap-2">
+              <Upload className="w-4 h-4" />
+              Justificatif (Optionnel)
+            </label>
+            <div className="flex items-center gap-4">
+              <label className="flex-1 flex flex-col items-center justify-center h-32 px-4 py-6 bg-background/50 border-2 border-dashed border-border/50 rounded-2xl hover:border-primary/50 hover:bg-primary/5 cursor-pointer transition-all duration-200">
+                <Upload className="w-8 h-8 text-muted-foreground mb-2" />
+                <span className="text-sm text-muted-foreground">
+                  {proofFile ? proofFile.name : 'Cliquez ou glissez un fichier (Image, PDF)'}
+                </span>
+                <input
+                  type="file"
+                  className="hidden"
+                  accept="image/*,application/pdf"
+                  onChange={(e) => setProofFile(e.target.files?.[0] || null)}
+                />
+              </label>
+              {proofFile && (
+                <button
+                  type="button"
+                  onClick={() => setProofFile(null)}
+                  className="p-2 text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
+                >
+                  Effacer
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-border/50">

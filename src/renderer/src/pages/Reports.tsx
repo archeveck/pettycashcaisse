@@ -100,8 +100,10 @@ export default function Reports(): React.ReactElement {
           `
           *,
           analytical_account:analytical_accounts (
+            id,
             code,
             name,
+            project_id,
             project:projects (
               name
             )
@@ -130,7 +132,7 @@ export default function Reports(): React.ReactElement {
       if (selectedProject) {
         filtered = filtered.filter(
           (t) =>
-            t.analytical_account?.project && t.analytical_account.project_id === selectedProject
+            t.analytical_account?.project_id === selectedProject
         )
       }
 
@@ -388,11 +390,10 @@ export default function Reports(): React.ReactElement {
                     <td className="py-3">{format(new Date(t.date), 'MMM d, HH:mm')}</td>
                     <td className="py-3">
                       <span
-                        className={`px-2 py-1 rounded text-xs font-medium ${
-                          t.type === 'inflow'
+                        className={`px-2 py-1 rounded text-xs font-medium ${t.type === 'inflow'
                             ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                             : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                        }`}
+                          }`}
                       >
                         {t.type}
                       </span>
@@ -419,11 +420,10 @@ export default function Reports(): React.ReactElement {
                     <td className="py-3">
                       {t.type === 'outflow' && (
                         <span
-                          className={`px-2 py-1 rounded text-xs ${
-                            t.proof_submitted_at
+                          className={`px-2 py-1 rounded text-xs ${t.proof_submitted_at
                               ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                               : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                          }`}
+                            }`}
                         >
                           {t.proof_submitted_at ? '✓ Soumis' : '⚠ Manquant'}
                         </span>

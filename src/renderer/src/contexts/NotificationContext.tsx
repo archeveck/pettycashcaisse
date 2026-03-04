@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react'
 import Toast, { NotificationType } from '../components/Toast'
 
 interface Notification {
@@ -13,7 +13,7 @@ interface NotificationContextType {
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined)
 
-export function useNotification() {
+export function useNotification(): NotificationContextType {
   const context = useContext(NotificationContext)
   if (!context) {
     throw new Error('useNotification must be used within NotificationProvider')
@@ -25,12 +25,34 @@ interface NotificationProviderProps {
   children: ReactNode
 }
 
-export function NotificationProvider({ children }: NotificationProviderProps) {
+export function NotificationProvider({ children }: NotificationProviderProps): React.ReactElement {
   const [notifications, setNotifications] = useState<Notification[]>([])
+
+  useEffect(() => {
+    if ('Notification' in window) {
+      if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+        Notification.requestPermission()
+      }
+    }
+  }, [])
 
   const showNotification = useCallback((message: string, type: NotificationType) => {
     const id = `${Date.now()}-${Math.random()}`
     setNotifications((prev) => [...prev, { id, message, type }])
+
+    // Native Desktop Notification
+    if ('Notification' in window && Notification.permission === 'granted') {
+      try {
+        new Notification('Caisse Pettycash', {
+          body: message,
+          icon: '/favicon.ico', // Adjust icon path if needed
+          requireInteraction: true, // Makes it persistent until user clicks/closes
+          tag: id // Unique tag to avoid duplicates if many triggered fast
+        })
+      } catch (err) {
+        console.error('Error showing native notification:', err)
+      }
+    }
   }, [])
 
   const removeNotification = useCallback((id: string) => {

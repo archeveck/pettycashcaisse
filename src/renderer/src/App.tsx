@@ -18,6 +18,7 @@ import Settings from './pages/Settings'
 import AccountantDashboard from './pages/AccountantDashboard'
 import Unauthorized from './pages/Unauthorized'
 import NotificationTest from './pages/NotificationTest'
+import { UpdateNotification } from './components/UpdateNotification'
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
@@ -81,6 +82,7 @@ function App(): React.ReactElement {
               {/* Fallback */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
+            <UpdateNotification />
           </Router>
         </NotificationProvider>
       </AuthProvider>
