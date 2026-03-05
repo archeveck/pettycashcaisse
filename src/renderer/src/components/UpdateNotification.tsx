@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Download, X, RefreshCw } from 'lucide-react'
 
 interface UpdateInfo {
@@ -12,7 +12,7 @@ interface DownloadProgress {
   total: number
 }
 
-export function UpdateNotification(): JSX.Element | null {
+export function UpdateNotification(): React.ReactElement | null {
   const [updateAvailable, setUpdateAvailable] = useState(false)
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null)
   const [downloading, setDownloading] = useState(false)
@@ -102,7 +102,7 @@ export function UpdateNotification(): JSX.Element | null {
         {/* Contenu */}
         <div className="mb-4 text-sm text-gray-600">
           {updateReady ? (
-            <p>La mise à jour est prête à être installée. L'application va redémarrer.</p>
+            <p>La mise à jour est prête à être installée. L&apos;application va redémarrer.</p>
           ) : (
             <>
               <p className="mb-1">
