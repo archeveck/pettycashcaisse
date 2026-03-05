@@ -6,13 +6,9 @@ on:
       - 'v*'
 
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
+  build-windows:
+    runs-on: windows-latest
     timeout-minutes: 30
-
-    strategy:
-      matrix:
-        os: [macos-latest, windows-latest]
 
     steps:
       - name: Checkout
@@ -22,13 +18,43 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'npm'
 
-      - name: Build and Publish
-        uses: samuelmeuli/action-electron-builder@v1
+      - name: Install dependencies
+        run: npm install --ignore-scripts
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 0
+
+      - name: Install Electron
+        run: npx electron@latest --version || echo "Electron binary ready"
+
+      - name: Build app
+        run: npm run build
+
+      - name: Package for Windows
+        run: npx electron-builder --win --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-mac:
+    runs-on: macos-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          release: ${{ startsWith(github.ref, 'refs/tags/v') }}
-          build_script_name: build
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install --ignore-scripts
+
+      - name: Build app
+        run: npm run build
+
+      - name: Package for macOS
+        run: npx electron-builder --mac --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
