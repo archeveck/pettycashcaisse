@@ -45,6 +45,6 @@ appImage:
 npmRebuild: false
 publish:
   provider: github
-  owner: VOTRE-USERNAME
-  repo: caissePettycash
+  owner: archeveck
+  repo: pettycashcaisse
   releaseType: release
