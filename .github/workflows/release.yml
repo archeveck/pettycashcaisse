@@ -24,10 +24,11 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
-      - name: Build and Publish
-        run: npm run build
+      # La construction est gérée par l'action samuelmeuli/action-electron-builder
+      # au-dessous, donc on n'a pas besoin de run build manuellement ici
+      # sauf si on veut faire des tests spécifiques.
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           # Pour Windows/Mac code signing (si configuré)
@@ -42,5 +43,6 @@ jobs:
         with:
           github_token: ${{ secrets.github_token }}
           release: true
+          build_script_name: build
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
