@@ -5,4 +5,11 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// Export configuration status to handle UI gracefully
+export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey)
+
+// Create client only if configuration is valid to avoid crashing at startup
+export const supabase = createClient(
+  supabaseUrl || 'https://placeholder.supabase.co',
+  supabaseAnonKey || 'placeholder'
+)

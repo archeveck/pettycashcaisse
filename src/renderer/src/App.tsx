@@ -21,10 +21,31 @@ import NotificationTest from './pages/NotificationTest'
 import { UpdateNotification } from './components/UpdateNotification'
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { isSupabaseConfigured } from './services/supabase'
+import { AlertTriangle } from 'lucide-react'
 
 const queryClient = new QueryClient()
 
 function App(): React.ReactElement {
+  if (!isSupabaseConfigured) {
+    return (
+      <div className="flex h-screen w-screen flex-col items-center justify-center gap-4 bg-gray-50 p-8 text-center">
+        <AlertTriangle className="h-16 w-16 text-amber-500" />
+        <h1 className="text-2xl font-bold text-gray-900">Erreur de Configuration</h1>
+        <p className="max-w-md text-gray-600">
+          Les variables d&apos;environnement Supabase sont manquantes. Veuillez vérifier votre configuration dans GitHub Secrets ou votre fichier .env.
+        </p>
+        <div className="mt-4 rounded-md bg-white p-4 text-left font-mono text-sm shadow-sm">
+          <p>Requis :</p>
+          <ul className="mt-2 list-inside list-disc">
+            <li>VITE_SUPABASE_URL</li>
+            <li>VITE_SUPABASE_ANON_KEY</li>
+          </ul>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
