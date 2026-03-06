@@ -1,9 +1,9 @@
 {
   "name": "caisse-pettycash",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "description": "Application de gestion de caisse petty cash",
   "main": "./out/main/index.js",
-  "author": "Votre Organisation",
+  "author": "HA",
   "homepage": "https://github.com/archeveck/pettycashcaisse",
   "repository": {
     "type": "git",
