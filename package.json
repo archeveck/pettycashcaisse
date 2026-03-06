@@ -1,6 +1,6 @@
 {
   "name": "caisse-pettycash",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "Application de gestion de caisse petty cash",
   "main": "./out/main/index.js",
   "author": "Votre Organisation",

@@ -28,18 +28,22 @@ const queryClient = new QueryClient()
 
 function App(): React.ReactElement {
   if (!isSupabaseConfigured) {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
+    const partialUrl = supabaseUrl ? `...${supabaseUrl.slice(-4)}` : 'vide'
+
     return (
       <div className="flex h-screen w-screen flex-col items-center justify-center gap-4 bg-gray-50 p-8 text-center">
         <AlertTriangle className="h-16 w-16 text-amber-500" />
         <h1 className="text-2xl font-bold text-gray-900">Erreur de Configuration</h1>
         <p className="max-w-md text-gray-600">
-          Les variables d&apos;environnement Supabase sont manquantes. Veuillez vérifier votre configuration dans GitHub Secrets ou votre fichier .env.
+          Les variables d&apos;environnement Supabase sont manquantes dans ce build.
+          Vérifiez vos <strong>Secrets GitHub</strong> et assurez-vous de pousser un <strong>nouveau tag</strong> (ex: v1.0.9) après les avoir ajoutés.
         </p>
         <div className="mt-4 rounded-md bg-white p-4 text-left font-mono text-sm shadow-sm">
-          <p>Requis :</p>
-          <ul className="mt-2 list-inside list-disc">
-            <li>VITE_SUPABASE_URL</li>
-            <li>VITE_SUPABASE_ANON_KEY</li>
+          <p className="font-semibold">Diagnostic :</p>
+          <ul className="mt-2 space-y-1">
+            <li>VITE_SUPABASE_URL : {partialUrl}</li>
+            <li>VITE_SUPABASE_ANON_KEY : {import.meta.env.VITE_SUPABASE_ANON_KEY ? 'configurée' : 'vide'}</li>
           </ul>
         </div>
       </div>
