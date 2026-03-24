@@ -290,11 +290,10 @@ export default function Settings(): React.ReactElement {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2 font-medium transition-colors border-b-2 ${
-              activeTab === tab.id
+            className={`px-4 py-2 font-medium transition-colors border-b-2 ${activeTab === tab.id
                 ? 'border-primary text-primary'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
+              }`}
           >
             {tab.label}
           </button>
@@ -631,7 +630,7 @@ export default function Settings(): React.ReactElement {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Nom d&apos;utilisateur / Email</label>
                       <input

@@ -27,6 +27,10 @@ interface Transaction {
   date: string
   description: string
   proof_submitted_at: string | null
+  proof_document_url?: string | null
+  request?: {
+    proof_document_url: string | null
+  }
   analytical_account?: {
     code: string
     name: string
@@ -107,6 +111,9 @@ export default function Reports(): React.ReactElement {
             project:projects (
               name
             )
+          ),
+          request:cash_requests (
+            proof_document_url
           )
         `
         )
@@ -156,7 +163,7 @@ export default function Reports(): React.ReactElement {
   const netBalance = totalInflows - totalOutflows
 
   const lateProofs = transactions.filter(
-    (t) => t.type === 'outflow' && !t.proof_submitted_at
+    (t) => t.type === 'outflow' && !t.proof_submitted_at && !t.request?.proof_document_url
   ).length
 
   // Prepare chart data
@@ -191,7 +198,7 @@ export default function Reports(): React.ReactElement {
       t.description,
       t.analytical_account?.code || 'N/A',
       t.analytical_account?.project?.name || 'N/A',
-      t.proof_submitted_at ? 'Soumis' : 'Manquant'
+      (t.proof_submitted_at || t.request?.proof_document_url) ? 'Soumis' : 'Manquant'
     ])
 
     const csvContent = [headers, ...rows].map((row) => row.join(',')).join('\n')
@@ -209,7 +216,7 @@ export default function Reports(): React.ReactElement {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-3xl font-bold tracking-tight">Rapports</h1>
         <button
           onClick={exportToCSV}
@@ -391,8 +398,8 @@ export default function Reports(): React.ReactElement {
                     <td className="py-3">
                       <span
                         className={`px-2 py-1 rounded text-xs font-medium ${t.type === 'inflow'
-                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                            : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                          : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
                           }`}
                       >
                         {t.type}
@@ -420,12 +427,12 @@ export default function Reports(): React.ReactElement {
                     <td className="py-3">
                       {t.type === 'outflow' && (
                         <span
-                          className={`px-2 py-1 rounded text-xs ${t.proof_submitted_at
-                              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                              : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                          className={`px-2 py-1 rounded text-xs ${(t.proof_submitted_at || t.request?.proof_document_url)
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                            : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
                             }`}
                         >
-                          {t.proof_submitted_at ? '✓ Soumis' : '⚠ Manquant'}
+                          {(t.proof_submitted_at || t.request?.proof_document_url) ? '✓ Soumis' : '⚠ Manquant'}
                         </span>
                       )}
                     </td>

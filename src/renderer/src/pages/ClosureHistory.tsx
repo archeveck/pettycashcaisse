@@ -151,7 +151,7 @@ export default function ClosureHistory(): React.ReactElement {
                 key={closure.id}
                 className="p-6 bg-card rounded-lg border border-border shadow-sm"
               >
-                <div className="flex justify-between items-start mb-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
                   <div>
                     <h3 className="text-lg font-semibold">
                       {format(new Date(closure.date), 'EEEE, MMMM d, yyyy')}
@@ -202,9 +202,8 @@ export default function ClosureHistory(): React.ReactElement {
                   <div>
                     <p className="text-xs text-muted-foreground mb-1">Variation Journalière</p>
                     <p
-                      className={`font-semibold ${
-                        dailyChange > 0 ? 'text-green-600' : dailyChange < 0 ? 'text-red-600' : ''
-                      }`}
+                      className={`font-semibold ${dailyChange > 0 ? 'text-green-600' : dailyChange < 0 ? 'text-red-600' : ''
+                        }`}
                     >
                       {dailyChange > 0 ? '+' : ''}
                       {new Intl.NumberFormat('fr-FR', {
@@ -219,9 +218,9 @@ export default function ClosureHistory(): React.ReactElement {
                     <p className="text-sm text-muted-foreground">
                       {index < closures.length - 1
                         ? new Intl.NumberFormat('fr-FR', {
-                            style: 'currency',
-                            currency: 'XOF'
-                          }).format(expectedOpening)
+                          style: 'currency',
+                          currency: 'XOF'
+                        }).format(expectedOpening)
                         : 'N/D'}
                     </p>
                   </div>

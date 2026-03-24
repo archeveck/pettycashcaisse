@@ -30,6 +30,7 @@ interface Transaction {
   request_id?: string
   request?: {
     id: string
+    proof_document_url?: string | null
     requester: {
       full_name: string
     }
@@ -60,6 +61,7 @@ interface CashRequest {
       name: string
     }
   }
+  proof_document_url?: string | null
 }
 
 export default function CashierDashboard(): React.ReactElement {
@@ -118,6 +120,7 @@ export default function CashierDashboard(): React.ReactElement {
           status,
           created_at,
           analytical_account_id,
+          proof_document_url,
           requester:profiles (
             full_name
           ),
@@ -151,6 +154,7 @@ export default function CashierDashboard(): React.ReactElement {
           request_id,
           request:cash_requests (
             id,
+            proof_document_url,
             requester:profiles (
               full_name
             ),
@@ -181,8 +185,7 @@ export default function CashierDashboard(): React.ReactElement {
       const currentBalance =
         transactions?.reduce((acc, curr) => {
           const amount = curr.amount
-          const change = curr.change_amount || 0
-          return curr.type === 'inflow' ? acc + amount : acc - amount + change
+          return curr.type === 'inflow' ? acc + amount : acc - amount
         }, 0) || 0
 
       setBalance(currentBalance)
@@ -217,12 +220,37 @@ export default function CashierDashboard(): React.ReactElement {
     if (!selectedTransactionId || changeAmount < 0) return
     setIsProcessingReturnChange(true)
     try {
-      const { error } = await supabase
+      // 1. Fetch original transaction details
+      const { data: originalTx, error: fetchErr } = await supabase
+        .from('cash_transactions')
+        .select('*')
+        .eq('id', selectedTransactionId)
+        .single()
+
+      if (fetchErr) throw fetchErr
+
+      // 2. Insert new inflow transaction for the returned change
+      const { error: insertError } = await supabase
+        .from('cash_transactions')
+        .insert({
+          type: 'inflow',
+          amount: changeAmount,
+          description: `Retour monnaie sur: ${originalTx.description}`,
+          created_by: profile?.id,
+          analytical_account_id: originalTx.analytical_account_id,
+          request_id: originalTx.request_id,
+          accounting_account_id: originalTx.accounting_account_id
+        })
+
+      if (insertError) throw insertError
+
+      // 3. Update change_amount on the original transaction for UI indicators
+      const { error: updateError } = await supabase
         .from('cash_transactions')
         .update({ change_amount: changeAmount })
         .eq('id', selectedTransactionId)
 
-      if (error) throw error
+      if (updateError) throw updateError
 
       showNotification('Retour monnaie enregistré avec succès !', 'success')
       setIsReturnChangeModalOpen(false)
@@ -388,7 +416,7 @@ export default function CashierDashboard(): React.ReactElement {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight">Caisse</h1>
         <div className="flex items-center gap-4">
           <div className="text-right">
@@ -436,7 +464,7 @@ export default function CashierDashboard(): React.ReactElement {
             <div className="space-y-3">
               {approvedRequests.map((req) => (
                 <div key={req.id} className="p-4 bg-card border border-border rounded-lg shadow-sm">
-                  <div className="flex justify-between items-start mb-2">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2 gap-2">
                     <div>
                       <p className="font-medium">{req.requester.full_name}</p>
                       <p className="text-sm text-muted-foreground">{req.description}</p>
@@ -482,7 +510,7 @@ export default function CashierDashboard(): React.ReactElement {
             <div className="space-y-3">
               {recentTransactions.map((t) => (
                 <div key={t.id} className="p-3 bg-card border border-border rounded-lg shadow-sm">
-                  <div className="flex justify-between items-start">
+                  <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
                     <div className="flex gap-3">
                       <div
                         className={`mt-1 p-1.5 rounded-full ${t.type === 'inflow' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}
@@ -505,7 +533,7 @@ export default function CashierDashboard(): React.ReactElement {
                         </p>
                       </div>
                     </div>
-                    <div className="text-right">
+                    <div className="text-left sm:text-right mt-2 sm:mt-0 w-full sm:w-auto flex flex-col items-start sm:items-end">
                       <p
                         className={`text-sm font-bold ${t.type === 'inflow' ? 'text-green-600' : 'text-foreground'}`}
                       >
@@ -514,45 +542,52 @@ export default function CashierDashboard(): React.ReactElement {
                       </p>
                       {t.type === 'outflow' && (
                         <div className="mt-2 flex justify-end">
-                          {t.proof_document_url ? (
-                            <a
-                              href={t.proof_document_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-[10px] text-blue-600 hover:underline flex items-center gap-1"
-                            >
-                              <CheckCircle2 className="w-3 h-3 text-green-600" />
-                              Justificatif envoyé
-                            </a>
-                          ) : (
-                            <div className="flex items-center gap-2">
-                              <span className="text-[10px] text-red-500 font-medium">
-                                Justificatif Manquant
-                              </span>
-                              <label
-                                className="cursor-pointer p-1 bg-primary/10 hover:bg-primary/20 text-primary rounded transition-colors"
-                                title="Ajouter le justificatif"
-                              >
-                                {isUploadingProof === t.id ? (
-                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                ) : (
-                                  <Upload className="w-3.5 h-3.5" />
-                                )}
-                                <input
-                                  type="file"
-                                  className="hidden"
-                                  accept="image/*,application/pdf"
-                                  value=""
-                                  onChange={(e) => {
-                                    const file = e.target.files?.[0]
-                                    console.log('File selected:', file?.name)
-                                    if (file) handleUpdateProof(t.id, file)
-                                  }}
-                                  disabled={!!isUploadingProof}
-                                />
-                              </label>
-                            </div>
-                          )}
+                          {(() => {
+                            const activeProofUrl = t.proof_document_url || t.request?.proof_document_url
+                            if (activeProofUrl) {
+                              return (
+                                <a
+                                  href={activeProofUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[10px] text-blue-600 hover:underline flex items-center gap-1"
+                                >
+                                  <CheckCircle2 className="w-3 h-3 text-green-600" />
+                                  Justificatif
+                                </a>
+                              )
+                            } else {
+                              return (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] text-red-500 font-medium">
+                                    Justificatif Manquant
+                                  </span>
+                                  <label
+                                    className="cursor-pointer p-1 bg-primary/10 hover:bg-primary/20 text-primary rounded transition-colors"
+                                    title="Ajouter le justificatif"
+                                  >
+                                    {isUploadingProof === t.id ? (
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    ) : (
+                                      <Upload className="w-3.5 h-3.5" />
+                                    )}
+                                    <input
+                                      type="file"
+                                      className="hidden"
+                                      accept="image/*,application/pdf"
+                                      value=""
+                                      onChange={(e) => {
+                                        const file = e.target.files?.[0]
+                                        console.log('File selected:', file?.name)
+                                        if (file) handleUpdateProof(t.id, file)
+                                      }}
+                                      disabled={!!isUploadingProof}
+                                    />
+                                  </label>
+                                </div>
+                              )
+                            }
+                          })()}
                         </div>
                       )}
                       {t.type === 'outflow' && t.request && (
@@ -634,6 +669,12 @@ export default function CashierDashboard(): React.ReactElement {
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">Justificatif (Optionnel)</label>
+                {selectedRequest.proof_document_url && (
+                  <div className="mb-2 p-2 bg-blue-50/50 text-blue-700 rounded-md text-xs flex items-center justify-between border border-blue-100">
+                    <span className="font-medium">Un justificatif a déjà été fourni par le demandeur.</span>
+                    <a href={selectedRequest.proof_document_url} target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-800">Voir</a>
+                  </div>
+                )}
                 <input
                   type="file"
                   accept="image/*,application/pdf"

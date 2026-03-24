@@ -35,6 +35,7 @@ interface Transaction {
   }
   request?: {
     id: string
+    proof_document_url?: string | null
     requester: {
       full_name: string
     }
@@ -74,14 +75,11 @@ export default function Transactions(): React.ReactElement {
 
   useEffect(() => {
     const end = new Date()
-    const start = new Date()
+    const start = new Date(2026, 0, 1) // 01/01/2026
 
-    // If filtering for missing proofs, expand date range to find old ones
+    // If filtering for missing proofs, just set the flag without modifying start date
     if (searchParams.get('filter') === 'missing_proof') {
-      start.setFullYear(start.getFullYear() - 1) // 1 year instead of 30 days
       setShowMissingProof(true)
-    } else {
-      start.setDate(start.getDate() - 30)
     }
 
     setStartDate(start.toISOString().split('T')[0])
@@ -121,6 +119,7 @@ export default function Transactions(): React.ReactElement {
           ),
           request:cash_requests (
             id,
+            proof_document_url,
             requester:profiles!requester_id (
               full_name
             )
@@ -210,12 +209,37 @@ export default function Transactions(): React.ReactElement {
     if (!selectedTransactionId || changeAmount < 0) return
     setIsProcessingReturnChange(true)
     try {
-      const { error } = await supabase
+      // 1. Fetch original transaction details
+      const { data: originalTx, error: fetchErr } = await supabase
+        .from('cash_transactions')
+        .select('*')
+        .eq('id', selectedTransactionId)
+        .single()
+
+      if (fetchErr) throw fetchErr
+
+      // 2. Insert new inflow transaction for the returned change
+      const { error: insertError } = await supabase
+        .from('cash_transactions')
+        .insert({
+          type: 'inflow',
+          amount: changeAmount,
+          description: `Retour monnaie sur: ${originalTx.description}`,
+          created_by: profile?.id,
+          analytical_account_id: originalTx.analytical_account_id,
+          request_id: originalTx.request_id,
+          accounting_account_id: originalTx.accounting_account_id
+        })
+
+      if (insertError) throw insertError
+
+      // 3. Update change_amount on the original transaction for UI indicators
+      const { error: updateError } = await supabase
         .from('cash_transactions')
         .update({ change_amount: changeAmount })
         .eq('id', selectedTransactionId)
 
-      if (error) throw error
+      if (updateError) throw updateError
 
       showNotification('Retour monnaie enregistré avec succès !', 'success')
       setIsReturnChangeModalOpen(false)
@@ -243,7 +267,7 @@ export default function Transactions(): React.ReactElement {
 
   const totalOutflows = transactions
     .filter((t) => t.type === 'outflow')
-    .reduce((sum, t) => sum + (t.amount - (t.change_amount || 0)), 0)
+    .reduce((sum, t) => sum + t.amount, 0)
 
   const netBalance = totalInflows - totalOutflows
 
@@ -296,7 +320,7 @@ export default function Transactions(): React.ReactElement {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-3xl font-bold tracking-tight">Transactions de Caisse</h1>
         {['admin', 'cashier'].includes(profile?.role || '') && (
           <button
@@ -553,49 +577,59 @@ export default function Transactions(): React.ReactElement {
                           </button>
                         )}
                         <div className="flex items-center gap-2">
-                          {t.proof_document_url ? (
-                            <a
-                              href={t.proof_document_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs text-blue-600 hover:underline flex items-center gap-1"
-                            >
-                              <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
-                              Voir Justif
-                            </a>
-                          ) : t.type === 'outflow' ? (
-                            <>
-                              <span className="text-xs text-yellow-600 font-medium whitespace-nowrap">
-                                ⚠ Pas de Justif
-                              </span>
-                              {['admin', 'cashier'].includes(profile?.role || '') && (
-                                <label
-                                  className="cursor-pointer p-1 bg-primary/10 hover:bg-primary/20 text-primary rounded transition-colors"
-                                  title="Ajouter le justificatif"
+                          {(() => {
+                            const activeProofUrl =
+                              t.proof_document_url || t.request?.proof_document_url
+                            if (activeProofUrl) {
+                              return (
+                                <a
+                                  href={activeProofUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-blue-600 hover:underline flex items-center gap-1"
                                 >
-                                  {isUploadingProof === t.id ? (
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                  ) : (
-                                    <Upload className="w-3.5 h-3.5" />
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+                                  Voir Justificatif
+                                </a>
+                              )
+                            } else if (t.type === 'outflow') {
+                              return (
+                                <>
+                                  <span className="text-xs text-yellow-600 font-medium whitespace-nowrap">
+                                    ⚠ Pas de Justif
+                                  </span>
+                                  {['admin', 'cashier'].includes(profile?.role || '') && (
+                                    <label
+                                      className="cursor-pointer p-1 bg-primary/10 hover:bg-primary/20 text-primary rounded transition-colors"
+                                      title="Ajouter le justificatif"
+                                    >
+                                      {isUploadingProof === t.id ? (
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                      ) : (
+                                        <Upload className="w-3.5 h-3.5" />
+                                      )}
+                                      <input
+                                        type="file"
+                                        className="hidden"
+                                        accept="image/*,application/pdf"
+                                        value=""
+                                        onChange={(e) => {
+                                          const file = e.target.files?.[0]
+                                          console.log('File selected:', file?.name)
+                                          if (file) handleUpdateProof(t.id, file)
+                                        }}
+                                        disabled={!!isUploadingProof}
+                                      />
+                                    </label>
                                   )}
-                                  <input
-                                    type="file"
-                                    className="hidden"
-                                    accept="image/*,application/pdf"
-                                    value=""
-                                    onChange={(e) => {
-                                      const file = e.target.files?.[0]
-                                      console.log('File selected:', file?.name)
-                                      if (file) handleUpdateProof(t.id, file)
-                                    }}
-                                    disabled={!!isUploadingProof}
-                                  />
-                                </label>
-                              )}
-                            </>
-                          ) : (
-                            <span className="text-xs text-muted-foreground italic">Entrée</span>
-                          )}
+                                </>
+                              )
+                            } else {
+                              return (
+                                <span className="text-xs text-muted-foreground italic">Entrée</span>
+                              )
+                            }
+                          })()}
                         </div>
                       </div>
                     </td>

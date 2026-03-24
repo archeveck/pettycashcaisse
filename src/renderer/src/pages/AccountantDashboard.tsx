@@ -166,14 +166,14 @@ export default function AccountantDashboard(): React.ReactElement {
       !selectedProjectId ||
       (t.analytical_account &&
         t.analytical_account.project.name ===
-          projects.find((p) => p.id === selectedProjectId)?.name)
+        projects.find((p) => p.id === selectedProjectId)?.name)
 
     // Analytical account filter
     const matchesAnalyticalId =
       !selectedAnalyticalAccountId ||
       (t.analytical_account &&
         analyticalAccounts.find((a) => a.id === selectedAnalyticalAccountId)?.code ===
-          t.analytical_account.code)
+        t.analytical_account.code)
 
     // Date Range filter
     let matchesDate = true
@@ -260,7 +260,7 @@ export default function AccountantDashboard(): React.ReactElement {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Comptabilité</h1>
           <p className="text-muted-foreground">
@@ -282,15 +282,14 @@ export default function AccountantDashboard(): React.ReactElement {
           </button>
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md border transition-colors ${
-              showFilters ||
-              selectedProjectId ||
-              selectedAnalyticalAccountId ||
-              selectedStartDate ||
-              selectedEndDate
+            className={`flex items-center gap-2 px-4 py-2 rounded-md border transition-colors ${showFilters ||
+                selectedProjectId ||
+                selectedAnalyticalAccountId ||
+                selectedStartDate ||
+                selectedEndDate
                 ? 'bg-primary/10 border-primary text-primary'
                 : 'border-border hover:bg-muted'
-            }`}
+              }`}
           >
             <Filter className="w-4 h-4" />
             Filtres
@@ -314,7 +313,7 @@ export default function AccountantDashboard(): React.ReactElement {
 
       {showFilters && (
         <div className="p-4 bg-muted/30 rounded-lg border border-border grid grid-cols-1 md:grid-cols-4 gap-4 animate-in slide-in-from-top-2 duration-200">
-          <div className="space-y-1.5 col-span-2 grid grid-cols-2 gap-2">
+          <div className="space-y-1.5 col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div className="space-y-1.5">
               <label className="text-xs font-medium flex items-center gap-1.5 text-muted-foreground">
                 <Calendar className="w-3 h-3" />

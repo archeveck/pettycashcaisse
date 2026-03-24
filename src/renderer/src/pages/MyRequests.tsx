@@ -26,6 +26,7 @@ interface CashRequest {
     }
   }
   proof_document_url?: string | null
+  transactions?: { proof_document_url: string | null }[]
 }
 
 interface VoucherData {
@@ -74,7 +75,8 @@ export default function MyRequests(): React.ReactElement {
               project:projects (
                 name
               )
-            )
+            ),
+            transactions:cash_transactions(proof_document_url)
           `
           )
           .order('created_at', { ascending: false })
@@ -152,7 +154,7 @@ export default function MyRequests(): React.ReactElement {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight">
           {profile?.role === 'requester' ? 'Mes Demandes' : 'Toutes les Demandes'}
         </h1>
@@ -229,38 +231,43 @@ export default function MyRequests(): React.ReactElement {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-col gap-2">
-                        {request.proof_document_url && (
-                          <a
-                            href={request.proof_document_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                        {(() => {
+                          const activeProofUrl = request.proof_document_url || request.transactions?.[0]?.proof_document_url;
+                          return activeProofUrl ? (
+                            <a
+                              href={activeProofUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+                              Voir
+                            </a>
+                          ) : null;
+                        })()}
+                        {!(request.proof_document_url || request.transactions?.[0]?.proof_document_url) && (
+                          <label
+                            className="cursor-pointer p-1.5 bg-primary/10 hover:bg-primary/20 text-primary rounded-md transition-colors flex items-center gap-1 text-xs w-fit"
+                            title="Ajouter le justificatif"
                           >
-                            <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
-                            Voir
-                          </a>
+                            {isUploadingProof === request.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Upload className="w-3.5 h-3.5" />
+                            )}
+                            Joindre
+                            <input
+                              type="file"
+                              className="hidden"
+                              accept="image/*,application/pdf"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0]
+                                if (file) handleUpdateProof(request.id, file)
+                              }}
+                              disabled={!!isUploadingProof}
+                            />
+                          </label>
                         )}
-                        <label
-                          className="cursor-pointer p-1.5 bg-primary/10 hover:bg-primary/20 text-primary rounded-md transition-colors flex items-center gap-1 text-xs w-fit"
-                          title={request.proof_document_url ? 'Modifier le justificatif' : 'Ajouter le justificatif'}
-                        >
-                          {isUploadingProof === request.id ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <Upload className="w-3.5 h-3.5" />
-                          )}
-                          {request.proof_document_url ? 'Modifier' : 'Joindre'}
-                          <input
-                            type="file"
-                            className="hidden"
-                            accept="image/*,application/pdf"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0]
-                              if (file) handleUpdateProof(request.id, file)
-                            }}
-                            disabled={!!isUploadingProof}
-                          />
-                        </label>
                       </div>
                     </td>
                     <td className="px-6 py-4">

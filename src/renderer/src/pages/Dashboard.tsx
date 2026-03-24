@@ -338,7 +338,7 @@ export default function Dashboard(): React.ReactElement {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
             Tableau de Bord
@@ -366,24 +366,24 @@ export default function Dashboard(): React.ReactElement {
             profile?.role === 'admin' ||
             profile?.role === 'cfo' ||
             profile?.role === 'controller') && (
-            <div className="group p-6 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
-              <div className="relative z-10">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
-                    <DollarSign className="w-6 h-6 text-white" />
+              <div className="group p-6 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
+                <div className="relative z-10">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+                      <DollarSign className="w-6 h-6 text-white" />
+                    </div>
+                    <h3 className="text-sm font-semibold text-white/90">Solde Actuel</h3>
                   </div>
-                  <h3 className="text-sm font-semibold text-white/90">Solde Actuel</h3>
-                </div>
-                <div className="text-3xl font-bold text-white">
-                  {new Intl.NumberFormat('fr-FR', {
-                    style: 'currency',
-                    currency: 'XOF'
-                  }).format(stats.currentBalance)}
+                  <div className="text-3xl font-bold text-white">
+                    {new Intl.NumberFormat('fr-FR', {
+                      style: 'currency',
+                      currency: 'XOF'
+                    }).format(stats.currentBalance)}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
           {/* Pending Validations - for controller */}
           {profile?.role === 'controller' && (
