@@ -53,7 +53,9 @@ export default function AccountantDashboard(): React.ReactElement {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedProjectId, setSelectedProjectId] = useState<string>('')
   const [selectedAnalyticalAccountId, setSelectedAnalyticalAccountId] = useState<string>('')
-  const [selectedStartDate, setSelectedStartDate] = useState<string>('')
+  const [selectedStartDate, setSelectedStartDate] = useState<string>(
+    new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0]
+  )
   const [selectedEndDate, setSelectedEndDate] = useState<string>('')
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [showFilters, setShowFilters] = useState(false)
@@ -283,12 +285,12 @@ export default function AccountantDashboard(): React.ReactElement {
           <button
             onClick={() => setShowFilters(!showFilters)}
             className={`flex items-center gap-2 px-4 py-2 rounded-md border transition-colors ${showFilters ||
-                selectedProjectId ||
-                selectedAnalyticalAccountId ||
-                selectedStartDate ||
-                selectedEndDate
-                ? 'bg-primary/10 border-primary text-primary'
-                : 'border-border hover:bg-muted'
+              selectedProjectId ||
+              selectedAnalyticalAccountId ||
+              selectedStartDate ||
+              selectedEndDate
+              ? 'bg-primary/10 border-primary text-primary'
+              : 'border-border hover:bg-muted'
               }`}
           >
             <Filter className="w-4 h-4" />

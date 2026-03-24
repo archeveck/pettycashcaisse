@@ -12,7 +12,9 @@ import {
   getAnalyticalAccounts,
   AnalyticalAccount,
   getProjects,
-  Project
+  Project,
+  getSuppliers,
+  Supplier
 } from '../services/settingsService'
 
 interface CashRequest {
@@ -34,6 +36,7 @@ interface CashRequest {
     }
   }
   supplier?: {
+    id: string
     name: string
   } | null
   proof_document_url?: string | null
@@ -54,6 +57,8 @@ export default function Validations(): React.ReactElement {
   const [modifiedProjectId, setModifiedProjectId] = useState<string | null>(null)
   const [allAccounts, setAllAccounts] = useState<AnalyticalAccount[]>([])
   const [allProjects, setAllProjects] = useState<Project[]>([])
+  const [allSuppliers, setAllSuppliers] = useState<Supplier[]>([])
+  const [modifiedSupplierId, setModifiedSupplierId] = useState<string | null>(null)
 
   const fetchPendingRequests = useCallback(async (): Promise<void> => {
     if (!profile) return
@@ -87,7 +92,7 @@ id,
                 name
             )
         ),
-        supplier: suppliers(name)
+        supplier: suppliers(id, name)
             `
         )
         .eq('status', targetStatus)
@@ -109,11 +114,12 @@ id,
 
   const loadAccounts = async (): Promise<void> => {
     try {
-      const [accounts, projects] = await Promise.all([getAnalyticalAccounts(), getProjects()])
+      const [accounts, projects, suppliers] = await Promise.all([getAnalyticalAccounts(), getProjects(), getSuppliers()])
       setAllAccounts(accounts)
       setAllProjects(projects)
+      setAllSuppliers(suppliers)
     } catch (err) {
-      console.error('Error loading accounts and projects:', err)
+      console.error('Error loading accounts, projects and suppliers:', err)
     }
   }
 
@@ -147,6 +153,11 @@ id,
       // Include modified analytical account if changed
       if (editingRequestId === id && modifiedAccountId) {
         updates.analytical_account_id = modifiedAccountId
+      }
+
+      // Include modified supplier if changed
+      if (editingRequestId === id && modifiedSupplierId !== undefined) {
+        updates.supplier_id = modifiedSupplierId
       }
 
       const { error } = await supabase.from('cash_requests').update(updates).eq('id', id)
@@ -259,7 +270,7 @@ id,
                   )}
                   {editingRequestId === request.id ? (
                     <div className="flex flex-col gap-3 p-3 bg-secondary/30 rounded-lg">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div className="space-y-1">
                           <label className="text-xs font-semibold text-muted-foreground uppercase">
                             Modifier Projet
@@ -297,6 +308,20 @@ id,
                             disabled={!modifiedProjectId && !request.analytical_account.project.id}
                           />
                         </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-muted-foreground uppercase">
+                            Modifier Fournisseur
+                          </label>
+                          <SearchableSelect
+                            options={allSuppliers.map((s) => ({
+                              id: s.id,
+                              name: s.name
+                            }))}
+                            value={modifiedSupplierId !== null ? modifiedSupplierId : (request.supplier?.id || '')}
+                            onChange={(val) => setModifiedSupplierId(val)}
+                            placeholder="Rechercher un fournisseur..."
+                          />
+                        </div>
                       </div>
                       <div className="flex gap-2">
                         <button
@@ -304,6 +329,7 @@ id,
                             setEditingRequestId(null)
                             setModifiedAccountId(null)
                             setModifiedProjectId(null)
+                            setModifiedSupplierId(null)
                           }}
                           className="text-xs flex items-center gap-1 text-muted-foreground hover:text-foreground"
                         >
@@ -322,6 +348,7 @@ id,
                             setEditingRequestId(request.id)
                             setModifiedAccountId(request.analytical_account.id)
                             setModifiedProjectId(request.analytical_account.project.id)
+                            setModifiedSupplierId(request.supplier?.id || null)
                           }}
                           className="p-1 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-primary transition-all"
                           title="Modifier le compte"

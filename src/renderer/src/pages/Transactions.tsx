@@ -75,7 +75,7 @@ export default function Transactions(): React.ReactElement {
 
   useEffect(() => {
     const end = new Date()
-    const start = new Date(2026, 0, 1) // 01/01/2026
+    const start = new Date(new Date().getFullYear(), 0, 1)
 
     // If filtering for missing proofs, just set the flag without modifying start date
     if (searchParams.get('filter') === 'missing_proof') {

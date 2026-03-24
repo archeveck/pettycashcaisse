@@ -70,8 +70,7 @@ export default function Reports(): React.ReactElement {
   useEffect(() => {
     // Set default date range (last 30 days)
     const end = new Date()
-    const start = new Date()
-    start.setDate(start.getDate() - 30)
+    const start = new Date(new Date().getFullYear(), 0, 1)
     setStartDate(start.toISOString().split('T')[0])
     setEndDate(end.toISOString().split('T')[0])
 
