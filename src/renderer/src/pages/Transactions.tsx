@@ -162,7 +162,7 @@ export default function Transactions(): React.ReactElement {
         const requestIds = userRequests?.map((r) => r.id) || []
 
         if (requestIds.length > 0) {
-          query = query.in('request_id', requestIds)
+          query = query.in('request_id', requestIds).eq('type', 'outflow')
         } else {
           // No requests, no transactions
           setTransactions([])
@@ -365,7 +365,7 @@ export default function Transactions(): React.ReactElement {
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             >
               <option value="all">Tous</option>
-              <option value="inflow">Entrée</option>
+              {profile?.role !== 'requester' && <option value="inflow">Entrée</option>}
               <option value="outflow">Sortie</option>
             </select>
           </div>
@@ -423,17 +423,19 @@ export default function Transactions(): React.ReactElement {
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-3">
-        <div className="p-6 bg-card rounded-lg border border-border shadow-sm">
-          <div className="flex items-center gap-2 mb-2">
-            <TrendingUp className="w-5 h-5 text-green-600" />
-            <h3 className="text-sm font-medium text-muted-foreground">Total Entrées</h3>
+        {profile?.role !== 'requester' && (
+          <div className="p-6 bg-card rounded-lg border border-border shadow-sm">
+            <div className="flex items-center gap-2 mb-2">
+              <TrendingUp className="w-5 h-5 text-green-600" />
+              <h3 className="text-sm font-medium text-muted-foreground">Total Entrées</h3>
+            </div>
+            <p className="text-2xl font-bold text-green-600">
+              {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XOF' }).format(
+                totalInflows
+              )}
+            </p>
           </div>
-          <p className="text-2xl font-bold text-green-600">
-            {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XOF' }).format(
-              totalInflows
-            )}
-          </p>
-        </div>
+        )}
 
         <div className="p-6 bg-card rounded-lg border border-border shadow-sm">
           <div className="flex items-center gap-2 mb-2">
@@ -515,7 +517,7 @@ export default function Transactions(): React.ReactElement {
                         ) : (
                           <TrendingDown className="w-3 h-3" />
                         )}
-                        {t.type}
+                        {t.type === 'inflow' ? 'Entrée' : 'Sortie'}
                       </span>
                     </td>
                     <td className="py-3 font-medium">
@@ -625,9 +627,9 @@ export default function Transactions(): React.ReactElement {
                                 </>
                               )
                             } else {
-                              return (
+                              return profile?.role !== 'requester' ? (
                                 <span className="text-xs text-muted-foreground italic">Entrée</span>
-                              )
+                              ) : null
                             }
                           })()}
                         </div>
