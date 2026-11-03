@@ -59,6 +59,7 @@ create table if not exists public.cash_requests (
   
   justification_url text,
   supplier text,
+  disbursement_date date,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );

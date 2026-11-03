@@ -14,6 +14,7 @@ interface CashRequest {
   description: string
   status: string
   created_at: string
+  disbursement_date?: string | null
   analytical_account: {
     code: string
     name: string
@@ -61,6 +62,7 @@ export default function MyRequests(): React.ReactElement {
           description,
           status,
           created_at,
+          disbursement_date,
           justification_url,
           analytical_account:analytical_accounts (
             code,
@@ -185,6 +187,7 @@ export default function MyRequests(): React.ReactElement {
               <thead className="text-xs text-muted-foreground uppercase bg-secondary/50 border-b border-border">
                 <tr>
                   <th className="px-6 py-3">Date</th>
+                  <th className="px-6 py-3">Décaissement</th>
                   <th className="px-6 py-3">Description</th>
                   <th className="px-6 py-3">Compte</th>
                   <th className="px-6 py-3">Montant</th>
@@ -201,6 +204,11 @@ export default function MyRequests(): React.ReactElement {
                   >
                     <td className="px-6 py-4 font-medium">
                       {format(new Date(request.created_at), 'MMM d, yyyy')}
+                    </td>
+                    <td className="px-6 py-4">
+                      {request.disbursement_date
+                        ? format(new Date(`${request.disbursement_date}T00:00:00`), 'MMM d, yyyy')
+                        : '—'}
                     </td>
                     <td className="px-6 py-4 max-w-xs truncate" title={request.description}>
                       {request.description}

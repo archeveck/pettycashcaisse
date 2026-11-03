@@ -18,6 +18,7 @@ const createRequestSchema = (
   description: z.ZodString
   analytical_account_id: z.ZodString
   supplier: z.ZodOptional<z.ZodString>
+  disbursement_date: z.ZodOptional<z.ZodString>
 }> =>
   z.object({
     amount: z
@@ -26,10 +27,16 @@ const createRequestSchema = (
       .max(maxLimit, `Le montant ne peut pas dépasser ${maxLimit.toLocaleString('fr-FR')} FCFA`),
     description: z.string().min(5, 'La description doit contenir au moins 5 caractères'),
     analytical_account_id: z.string().uuid('Veuillez sélectionner un compte analytique'),
-    supplier: z.string().trim().max(200, 'Maximum 200 caractères').optional()
+    supplier: z.string().trim().max(200, 'Maximum 200 caractères').optional(),
+    disbursement_date: z.string().optional()
   })
 
 type RequestFormValues = z.infer<ReturnType<typeof createRequestSchema>>
+
+interface ProjectOption {
+  code: string
+  name: string
+}
 
 interface AnalyticalAccount {
   id: string
@@ -61,6 +68,7 @@ export default function NewRequest(): React.ReactElement {
   const [fetchError] = useState<string | null>(null)
   const [maxOutflowLimit, setMaxOutflowLimit] = useState<number>(0)
   const [isLoadingSettings, setIsLoadingSettings] = useState(true)
+  const [projects, setProjects] = useState<ProjectOption[]>([])
   const [selectedProject, setSelectedProject] = useState('')
 
   const {
@@ -72,14 +80,8 @@ export default function NewRequest(): React.ReactElement {
     resolver: zodResolver(createRequestSchema(maxOutflowLimit || 999999999))
   })
 
-  // Distinct projects derived from the analytical accounts
-  const projects = Array.from(
-    new Map(accounts.map((a) => [a.project.code || a.project.name, a.project])).entries()
-  )
-    .filter(([key]) => key)
-    .sort((a, b) => a[1].name.localeCompare(b[1].name))
   const visibleAccounts = selectedProject
-    ? accounts.filter((a) => (a.project.code || a.project.name) === selectedProject)
+    ? accounts.filter((a) => a.project.code === selectedProject)
     : accounts
 
   // Fetch app settings and analytical accounts on mount
@@ -90,6 +92,14 @@ export default function NewRequest(): React.ReactElement {
         const settings = await getAppSettings()
         setMaxOutflowLimit(settings.max_outflow_limit)
         setIsLoadingSettings(false)
+
+        // Fetch all projects (independently of their analytical accounts)
+        const { data: projectData, error: projectError } = await supabase
+          .from('projects')
+          .select('code, name')
+          .order('name', { ascending: true })
+        if (projectError) throw projectError
+        setProjects(projectData || [])
 
         // Fetch analytical accounts
         const { data, error } = await supabase
@@ -142,6 +152,7 @@ export default function NewRequest(): React.ReactElement {
         analytical_account_id: values.analytical_account_id,
         requester_id: user.id,
         ...(values.supplier ? { supplier: values.supplier } : {}),
+        ...(values.disbursement_date ? { disbursement_date: values.disbursement_date } : {}),
         status: 'pending_controller'
       })
 
@@ -240,10 +251,9 @@ export default function NewRequest(): React.ReactElement {
               className="flex h-12 w-full rounded-xl border border-input bg-background/50 backdrop-blur-sm px-4 py-3 text-sm ring-offset-background transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:border-primary hover:border-primary/50"
             >
               <option value="">Tous les projets</option>
-              {projects.map(([key, project]) => (
-                <option key={key} value={key}>
-                  {project.code ? `${project.code} - ` : ''}
-                  {project.name}
+              {projects.map((project) => (
+                <option key={project.code} value={project.code}>
+                  {project.code} - {project.name}
                 </option>
               ))}
             </select>
@@ -288,6 +298,19 @@ export default function NewRequest(): React.ReactElement {
             {errors.supplier && (
               <p className="text-sm text-destructive">{errors.supplier.message}</p>
             )}
+          </div>
+
+          {/* Disbursement Date Field */}
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-foreground" htmlFor="disbursement_date">
+              Date de décaissement souhaitée
+            </label>
+            <input
+              id="disbursement_date"
+              type="date"
+              className="flex h-12 w-full rounded-xl border border-input bg-background/50 backdrop-blur-sm px-4 py-3 text-sm ring-offset-background transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:border-primary hover:border-primary/50"
+              {...register('disbursement_date')}
+            />
           </div>
 
           {/* Description Field */}
