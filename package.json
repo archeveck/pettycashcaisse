@@ -1,6 +1,6 @@
 {
   "name": "caisse-pettycash",
-  "version": "1.0.0",
+  "version": "1.0.14",
   "description": "An Electron application with React and TypeScript",
   "main": "./out/main/index.js",
   "author": "example.com",
@@ -31,6 +31,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "electron-store": "^11.0.2",
+    "electron-updater": "^6.8.11",
     "lucide-react": "^0.555.0",
     "react-hook-form": "^7.67.0",
     "react-router-dom": "^7.9.6",

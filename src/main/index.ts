@@ -1,6 +1,7 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { autoUpdater } from 'electron-updater'
 import icon from '../../resources/icon.png?asset'
 
 function createWindow(): void {
@@ -75,6 +76,11 @@ app.whenReady().then(() => {
   })
 
   createWindow()
+
+  // Auto-update from GitHub Releases (packaged builds only)
+  if (app.isPackaged) {
+    autoUpdater.checkForUpdatesAndNotify().catch((err) => console.error('Update check failed:', err))
+  }
 
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the
