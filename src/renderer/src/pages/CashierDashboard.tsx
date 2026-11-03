@@ -74,6 +74,8 @@ export default function CashierDashboard(): React.ReactElement {
   const [searchTerm, setSearchTerm] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [amountMin, setAmountMin] = useState('')
+  const [amountMax, setAmountMax] = useState('')
 
   // Upload state
   const [isUploadingProof, setIsUploadingProof] = useState<string | null>(null)
@@ -198,6 +200,8 @@ export default function CashierDashboard(): React.ReactElement {
     const day = format(new Date(req.created_at), 'yyyy-MM-dd')
     if (dateFrom && day < dateFrom) return false
     if (dateTo && day > dateTo) return false
+    if (amountMin !== '' && req.amount < Number(amountMin)) return false
+    if (amountMax !== '' && req.amount > Number(amountMax)) return false
     const term = searchTerm.trim().toLowerCase()
     if (!term) return true
     return [
@@ -209,7 +213,7 @@ export default function CashierDashboard(): React.ReactElement {
       String(req.amount)
     ].some((v) => v?.toLowerCase().includes(term))
   })
-  const hasFilters = !!(searchTerm || dateFrom || dateTo)
+  const hasFilters = !!(searchTerm || dateFrom || dateTo || amountMin || amountMax)
 
   const handlePrintVoucher =(transaction: Transaction): void => {
     if (transaction.type === 'outflow' && transaction.request) {
@@ -468,12 +472,32 @@ export default function CashierDashboard(): React.ReactElement {
               aria-label="Date de fin"
               className="px-2 py-1.5 text-sm bg-background border border-input rounded-md"
             />
+            <input
+              type="number"
+              min={0}
+              value={amountMin}
+              onChange={(e) => setAmountMin(e.target.value)}
+              placeholder="Montant min"
+              aria-label="Montant minimum"
+              className="w-28 px-2 py-1.5 text-sm bg-background border border-input rounded-md"
+            />
+            <input
+              type="number"
+              min={0}
+              value={amountMax}
+              onChange={(e) => setAmountMax(e.target.value)}
+              placeholder="Montant max"
+              aria-label="Montant maximum"
+              className="w-28 px-2 py-1.5 text-sm bg-background border border-input rounded-md"
+            />
             {hasFilters && (
               <button
                 onClick={() => {
                   setSearchTerm('')
                   setDateFrom('')
                   setDateTo('')
+                  setAmountMin('')
+                  setAmountMax('')
                 }}
                 className="px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground"
               >
