@@ -20,3 +20,4 @@ out
 dist-web
 build
 out
+.claude/settings.local.json
