@@ -51,6 +51,9 @@ export default function Transactions(): React.ReactElement {
   const [selectedAccount, setSelectedAccount] = useState('')
   const [isUploadingProof, setIsUploadingProof] = useState<string | null>(null)
   const [showMissingProof, setShowMissingProof] = useState(false)
+  const [searchText, setSearchText] = useState('')
+  const [amountMin, setAmountMin] = useState('')
+  const [amountMax, setAmountMax] = useState('')
   const [searchParams] = useSearchParams()
   const { showNotification } = useNotification()
 
@@ -188,12 +191,20 @@ export default function Transactions(): React.ReactElement {
     }
   }
 
+  // Local filters (libellé, montant) applied on the loaded transactions
+  const visibleTransactions = transactions.filter((t) => {
+    if (amountMin !== '' && t.amount < Number(amountMin)) return false
+    if (amountMax !== '' && t.amount > Number(amountMax)) return false
+    const term = searchText.trim().toLowerCase()
+    return !term || (t.description || '').toLowerCase().includes(term)
+  })
+
   // Calculate totals
-  const totalInflows = transactions
+  const totalInflows = visibleTransactions
     .filter((t) => t.type === 'inflow')
     .reduce((sum, t) => sum + t.amount, 0)
 
-  const totalOutflows = transactions
+  const totalOutflows = visibleTransactions
     .filter((t) => t.type === 'outflow')
     .reduce((sum, t) => sum + t.amount, 0)
 
@@ -272,6 +283,36 @@ export default function Transactions(): React.ReactElement {
                 ))}
             </select>
           </div>
+          <div className="space-y-2 md:col-span-3">
+            <label className="text-sm font-medium">Libellé</label>
+            <input
+              type="search"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              placeholder="Rechercher dans le libellé…"
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Montant min</label>
+            <input
+              type="number"
+              min={0}
+              value={amountMin}
+              onChange={(e) => setAmountMin(e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Montant max</label>
+            <input
+              type="number"
+              min={0}
+              value={amountMax}
+              onChange={(e) => setAmountMax(e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            />
+          </div>
           <div className="flex items-end pb-1 md:col-span-5">
             <label className="flex items-center gap-2 cursor-pointer group">
               <input
@@ -329,13 +370,13 @@ export default function Transactions(): React.ReactElement {
 
       {/* Transactions Table */}
       <div className="p-6 bg-card rounded-lg border border-border shadow-sm">
-        <h3 className="text-lg font-semibold mb-4">Transactions ({transactions.length})</h3>
+        <h3 className="text-lg font-semibold mb-4">Transactions ({visibleTransactions.length})</h3>
 
         {isLoading ? (
           <div className="flex items-center justify-center h-32">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
-        ) : transactions.length === 0 ? (
+        ) : visibleTransactions.length === 0 ? (
           <div className="text-center py-12">
             <Calendar className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
             <p className="text-muted-foreground">
@@ -362,7 +403,7 @@ export default function Transactions(): React.ReactElement {
                 </tr>
               </thead>
               <tbody>
-                {transactions.map((t) => (
+                {visibleTransactions.map((t) => (
                   <tr key={t.id} className="border-b border-border hover:bg-muted/50">
                     <td className="py-3">
                       <div className="flex items-center gap-2">
