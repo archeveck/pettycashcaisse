@@ -58,6 +58,7 @@ create table if not exists public.cash_requests (
   rejection_reason text,
   
   justification_url text,
+  supplier text,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );

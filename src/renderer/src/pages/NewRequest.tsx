@@ -17,6 +17,7 @@ const createRequestSchema = (
   amount: z.ZodNumber
   description: z.ZodString
   analytical_account_id: z.ZodString
+  supplier: z.ZodOptional<z.ZodString>
 }> =>
   z.object({
     amount: z
@@ -24,7 +25,8 @@ const createRequestSchema = (
       .min(1, 'Le montant doit être supérieur à 0')
       .max(maxLimit, `Le montant ne peut pas dépasser ${maxLimit.toLocaleString('fr-FR')} FCFA`),
     description: z.string().min(5, 'La description doit contenir au moins 5 caractères'),
-    analytical_account_id: z.string().uuid('Veuillez sélectionner un compte analytique')
+    analytical_account_id: z.string().uuid('Veuillez sélectionner un compte analytique'),
+    supplier: z.string().trim().max(200, 'Maximum 200 caractères').optional()
   })
 
 type RequestFormValues = z.infer<ReturnType<typeof createRequestSchema>>
@@ -59,14 +61,26 @@ export default function NewRequest(): React.ReactElement {
   const [fetchError] = useState<string | null>(null)
   const [maxOutflowLimit, setMaxOutflowLimit] = useState<number>(0)
   const [isLoadingSettings, setIsLoadingSettings] = useState(true)
+  const [selectedProject, setSelectedProject] = useState('')
 
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors }
   } = useForm<RequestFormValues>({
     resolver: zodResolver(createRequestSchema(maxOutflowLimit || 999999999))
   })
+
+  // Distinct projects derived from the analytical accounts
+  const projects = Array.from(
+    new Map(accounts.map((a) => [a.project.code || a.project.name, a.project])).entries()
+  )
+    .filter(([key]) => key)
+    .sort((a, b) => a[1].name.localeCompare(b[1].name))
+  const visibleAccounts = selectedProject
+    ? accounts.filter((a) => (a.project.code || a.project.name) === selectedProject)
+    : accounts
 
   // Fetch app settings and analytical accounts on mount
   useEffect(() => {
@@ -127,6 +141,7 @@ export default function NewRequest(): React.ReactElement {
         description: values.description,
         analytical_account_id: values.analytical_account_id,
         requester_id: user.id,
+        ...(values.supplier ? { supplier: values.supplier } : {}),
         status: 'pending_controller'
       })
 
@@ -210,6 +225,30 @@ export default function NewRequest(): React.ReactElement {
             )}
           </div>
 
+          {/* Project Field (filters the analytical accounts) */}
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-foreground" htmlFor="project">
+              Projet
+            </label>
+            <select
+              id="project"
+              value={selectedProject}
+              onChange={(e) => {
+                setSelectedProject(e.target.value)
+                setValue('analytical_account_id', '')
+              }}
+              className="flex h-12 w-full rounded-xl border border-input bg-background/50 backdrop-blur-sm px-4 py-3 text-sm ring-offset-background transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:border-primary hover:border-primary/50"
+            >
+              <option value="">Tous les projets</option>
+              {projects.map(([key, project]) => (
+                <option key={key} value={key}>
+                  {project.code ? `${project.code} - ` : ''}
+                  {project.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Analytical Account Field */}
           <div className="space-y-2">
             <label className="text-sm font-semibold text-foreground" htmlFor="account">
@@ -221,7 +260,7 @@ export default function NewRequest(): React.ReactElement {
               {...register('analytical_account_id')}
             >
               <option value="">Sélectionner un compte...</option>
-              {accounts.map((account) => (
+              {visibleAccounts.map((account) => (
                 <option key={account.id} value={account.id}>
                   {account.code} - {account.name} ({account.project.name})
                 </option>
@@ -231,6 +270,23 @@ export default function NewRequest(): React.ReactElement {
               <p className="text-sm text-destructive animate-in fade-in slide-in-from-top-1 duration-200">
                 {errors.analytical_account_id.message}
               </p>
+            )}
+          </div>
+
+          {/* Supplier Field */}
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-foreground" htmlFor="supplier">
+              Fournisseur
+            </label>
+            <input
+              id="supplier"
+              type="text"
+              className="flex h-12 w-full rounded-xl border border-input bg-background/50 backdrop-blur-sm px-4 py-3 text-sm ring-offset-background transition-all duration-200 placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:border-primary hover:border-primary/50"
+              placeholder="Nom du fournisseur (facultatif)"
+              {...register('supplier')}
+            />
+            {errors.supplier && (
+              <p className="text-sm text-destructive">{errors.supplier.message}</p>
             )}
           </div>
 

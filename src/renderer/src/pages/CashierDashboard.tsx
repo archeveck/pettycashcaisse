@@ -77,6 +77,14 @@ export default function CashierDashboard(): React.ReactElement {
   const [amountMin, setAmountMin] = useState('')
   const [amountMax, setAmountMax] = useState('')
 
+  // Recent transactions filters
+  const [txSearch, setTxSearch] = useState('')
+  const [txType, setTxType] = useState<'all' | 'inflow' | 'outflow'>('all')
+  const [txDateFrom, setTxDateFrom] = useState('')
+  const [txDateTo, setTxDateTo] = useState('')
+  const [txAmountMin, setTxAmountMin] = useState('')
+  const [txAmountMax, setTxAmountMax] = useState('')
+
   // Upload state
   const [isUploadingProof, setIsUploadingProof] = useState<string | null>(null)
   const [voucherData, setVoucherData] = useState<VoucherData | null>(null)
@@ -153,7 +161,7 @@ export default function CashierDashboard(): React.ReactElement {
           )
         `)
         .order('date', { ascending: false })
-        .limit(10)
+        .limit(100)
 
       if (recentError) throw recentError
       setRecentTransactions(recentTrans as unknown as Transaction[])
@@ -213,6 +221,28 @@ export default function CashierDashboard(): React.ReactElement {
       String(req.amount)
     ].some((v) => v?.toLowerCase().includes(term))
   })
+  const filteredTransactions = recentTransactions.filter((t) => {
+    if (txType !== 'all' && t.type !== txType) return false
+    const day = format(new Date(t.date), 'yyyy-MM-dd')
+    if (txDateFrom && day < txDateFrom) return false
+    if (txDateTo && day > txDateTo) return false
+    if (txAmountMin !== '' && t.amount < Number(txAmountMin)) return false
+    if (txAmountMax !== '' && t.amount > Number(txAmountMax)) return false
+    const term = txSearch.trim().toLowerCase()
+    if (!term) return true
+    return [
+      t.description,
+      t.request?.requester?.full_name,
+      t.request?.analytical_account?.code,
+      t.request?.analytical_account?.name,
+      t.request?.analytical_account?.project?.name,
+      String(t.amount)
+    ].some((v) => v?.toLowerCase().includes(term))
+  })
+  const hasTxFilters = !!(
+    txSearch || txType !== 'all' || txDateFrom || txDateTo || txAmountMin || txAmountMax
+  )
+
   const hasFilters = !!(searchTerm || dateFrom || dateTo || amountMin || amountMax)
 
   const handlePrintVoucher =(transaction: Transaction): void => {
@@ -552,17 +582,93 @@ export default function CashierDashboard(): React.ReactElement {
         <div className="space-y-4">
           <h2 className="text-xl font-semibold flex items-center gap-2">
             <HistoryIcon className="w-5 h-5" />
-            Transactions Récentes
+            Transactions Récentes ({filteredTransactions.length}
+            {hasTxFilters ? `/${recentTransactions.length}` : ''})
           </h2>
+
+          <div className="flex flex-wrap gap-2 items-center">
+            <div className="relative flex-1 min-w-[180px]">
+              <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="search"
+                value={txSearch}
+                onChange={(e) => setTxSearch(e.target.value)}
+                placeholder="Rechercher (libellé, nom, compte, montant)…"
+                aria-label="Rechercher une transaction"
+                className="w-full pl-8 pr-3 py-1.5 text-sm bg-background border border-input rounded-md"
+              />
+            </div>
+            <select
+              value={txType}
+              onChange={(e) => setTxType(e.target.value as 'all' | 'inflow' | 'outflow')}
+              aria-label="Type de transaction"
+              className="px-2 py-1.5 text-sm bg-background border border-input rounded-md"
+            >
+              <option value="all">Tous types</option>
+              <option value="inflow">Entrées</option>
+              <option value="outflow">Sorties</option>
+            </select>
+            <input
+              type="date"
+              value={txDateFrom}
+              max={txDateTo || undefined}
+              onChange={(e) => setTxDateFrom(e.target.value)}
+              aria-label="Date de début"
+              className="px-2 py-1.5 text-sm bg-background border border-input rounded-md"
+            />
+            <input
+              type="date"
+              value={txDateTo}
+              min={txDateFrom || undefined}
+              onChange={(e) => setTxDateTo(e.target.value)}
+              aria-label="Date de fin"
+              className="px-2 py-1.5 text-sm bg-background border border-input rounded-md"
+            />
+            <input
+              type="number"
+              min={0}
+              value={txAmountMin}
+              onChange={(e) => setTxAmountMin(e.target.value)}
+              placeholder="Montant min"
+              aria-label="Montant minimum"
+              className="w-28 px-2 py-1.5 text-sm bg-background border border-input rounded-md"
+            />
+            <input
+              type="number"
+              min={0}
+              value={txAmountMax}
+              onChange={(e) => setTxAmountMax(e.target.value)}
+              placeholder="Montant max"
+              aria-label="Montant maximum"
+              className="w-28 px-2 py-1.5 text-sm bg-background border border-input rounded-md"
+            />
+            {hasTxFilters && (
+              <button
+                onClick={() => {
+                  setTxSearch('')
+                  setTxType('all')
+                  setTxDateFrom('')
+                  setTxDateTo('')
+                  setTxAmountMin('')
+                  setTxAmountMax('')
+                }}
+                className="px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground"
+              >
+                Réinitialiser
+              </button>
+            )}
+          </div>
           {isLoading ? (
             <Loader2 className="w-6 h-6 animate-spin" />
-          ) : recentTransactions.length === 0 ? (
+          ) : filteredTransactions.length === 0 ? (
             <div className="p-4 bg-muted/20 rounded-lg border border-border border-dashed h-64 flex items-center justify-center text-muted-foreground">
-              L&apos;historique des transactions apparaîtra ici
+              {hasTxFilters
+                ? 'Aucune transaction ne correspond aux filtres.'
+                : 'L\u2019historique des transactions apparaîtra ici'}
             </div>
           ) : (
             <div className="space-y-3">
-              {recentTransactions.map((t) => (
+              {filteredTransactions.map((t) => (
                 <div key={t.id} className="p-3 bg-card border border-border rounded-lg shadow-sm">
                   <div className="flex justify-between items-start">
                     <div className="flex gap-3">
