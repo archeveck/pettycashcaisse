@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../services/supabase'
 import {
   Loader2,
@@ -28,10 +28,12 @@ interface Transaction {
   description: string
   proof_submitted_at: string | null
   analytical_account?: {
+    id: string
     code: string
     name: string
-    project_id?: string
+    project_id: string
     project: {
+      id: string
       name: string
     }
   }
@@ -75,12 +77,6 @@ export default function Reports(): React.ReactElement {
     fetchAccounts()
   }, [])
 
-  useEffect(() => {
-    if (startDate && endDate) {
-      fetchTransactions()
-    }
-  }, [startDate, endDate, selectedProject, selectedAccount, selectedType])
-
   const fetchProjects = async (): Promise<void> => {
     const { data } = await supabase.from('projects').select('*').eq('active', true)
     if (data) setProjects(data)
@@ -91,7 +87,7 @@ export default function Reports(): React.ReactElement {
     if (data) setAccounts(data)
   }
 
-  const fetchTransactions = async (): Promise<void> => {
+  const fetchTransactions = useCallback(async (): Promise<void> => {
     setIsLoading(true)
     try {
       let query = supabase
@@ -100,9 +96,12 @@ export default function Reports(): React.ReactElement {
           `
           *,
           analytical_account:analytical_accounts (
+            id,
             code,
             name,
+            project_id,
             project:projects (
+              id,
               name
             )
           )
@@ -126,12 +125,9 @@ export default function Reports(): React.ReactElement {
 
       let filtered = data as Transaction[]
 
-      // Filter by project if selected
+      // Filter by project if selected (analytical_account is nested)
       if (selectedProject) {
-        filtered = filtered.filter(
-          (t) =>
-            t.analytical_account?.project && t.analytical_account.project_id === selectedProject
-        )
+        filtered = filtered.filter((t) => t.analytical_account?.project_id === selectedProject)
       }
 
       setTransactions(filtered || [])
@@ -140,7 +136,13 @@ export default function Reports(): React.ReactElement {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [startDate, endDate, selectedType, selectedAccount, selectedProject])
+
+  useEffect(() => {
+    if (startDate && endDate) {
+      fetchTransactions()
+    }
+  }, [startDate, endDate, fetchTransactions])
 
   // Calculate summary statistics
   const totalInflows = transactions
@@ -388,11 +390,10 @@ export default function Reports(): React.ReactElement {
                     <td className="py-3">{format(new Date(t.date), 'MMM d, HH:mm')}</td>
                     <td className="py-3">
                       <span
-                        className={`px-2 py-1 rounded text-xs font-medium ${
-                          t.type === 'inflow'
-                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                            : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                        }`}
+                        className={`px-2 py-1 rounded text-xs font-medium ${t.type === 'inflow'
+                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                          : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                          }`}
                       >
                         {t.type}
                       </span>
@@ -419,11 +420,10 @@ export default function Reports(): React.ReactElement {
                     <td className="py-3">
                       {t.type === 'outflow' && (
                         <span
-                          className={`px-2 py-1 rounded text-xs ${
-                            t.proof_submitted_at
-                              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                              : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                          }`}
+                          className={`px-2 py-1 rounded text-xs ${t.proof_submitted_at
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                            : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                            }`}
                         >
                           {t.proof_submitted_at ? '✓ Soumis' : '⚠ Manquant'}
                         </span>

@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../services/supabase'
-import { Loader2, Plus, Printer } from 'lucide-react'
+import { Loader2, Plus, Printer, ExternalLink, Upload } from 'lucide-react'
 import CashVoucher from '../components/CashVoucher'
 import { Link } from 'react-router-dom'
 import { format } from 'date-fns'
+import { useNotification } from '../contexts/NotificationContext'
+import { getErrorMessage } from '../utils/errorUtils'
 
 interface CashRequest {
   id: string
@@ -19,6 +21,7 @@ interface CashRequest {
       name: string
     }
   }
+  justification_url?: string
 }
 
 interface VoucherData {
@@ -39,47 +42,83 @@ interface VoucherData {
 
 export default function MyRequests(): React.ReactElement {
   const { user, profile } = useAuth()
+  const { showNotification } = useNotification()
   const [requests, setRequests] = useState<CashRequest[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [voucherData, setVoucherData] = useState<VoucherData | null>(null)
+  const [uploadingId, setUploadingId] = useState<string | null>(null)
+
+  const fetchRequests = useCallback(async (): Promise<void> => {
+    if (!user) return
+
+    try {
+      const { data, error } = await supabase
+        .from('cash_requests')
+        .select(
+          `
+          id,
+          amount,
+          description,
+          status,
+          created_at,
+          justification_url,
+          analytical_account:analytical_accounts (
+            code,
+            name,
+            project:projects (
+              name
+            )
+          )
+        `
+        )
+        .eq('requester_id', user.id)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      setRequests(data as unknown as CashRequest[])
+    } catch (err) {
+      console.error('Error fetching requests:', err)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [user])
 
   useEffect(() => {
-    const fetchRequests = async (): Promise<void> => {
-      if (!user) return
-
-      try {
-        const { data, error } = await supabase
-          .from('cash_requests')
-          .select(
-            `
-            id,
-            amount,
-            description,
-            status,
-            created_at,
-            analytical_account:analytical_accounts (
-              code,
-              name,
-              project:projects (
-                name
-              )
-            )
-          `
-          )
-          .eq('requester_id', user.id)
-          .order('created_at', { ascending: false })
-
-        if (error) throw error
-        setRequests(data as unknown as CashRequest[])
-      } catch (err) {
-        console.error('Error fetching requests:', err)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
     fetchRequests()
-  }, [user])
+  }, [fetchRequests])
+
+  const handleUploadJustification = async (requestId: string, file: File): Promise<void> => {
+    setUploadingId(requestId)
+    try {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${requestId}_${Date.now()}.${fileExt}`
+      const filePath = `justifications/${fileName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('proof-documents')
+        .upload(filePath, file)
+
+      if (uploadError) throw uploadError
+
+      const { data: urlData } = supabase.storage.from('proof-documents').getPublicUrl(filePath)
+      const justification_url = urlData.publicUrl
+
+      const { error: updateError } = await supabase
+        .from('cash_requests')
+        .update({ justification_url })
+        .eq('id', requestId)
+
+      if (updateError) throw updateError
+
+      showNotification('Justificatif ajouté avec succès !', 'success')
+      fetchRequests()
+    } catch (err) {
+      console.error('Error uploading justification:', err)
+      showNotification(`Erreur lors de l'upload : ${getErrorMessage(err)}`, 'error')
+    } finally {
+      setUploadingId(null)
+    }
+  }
 
   const getStatusColor = (status: string): string => {
     switch (status) {
@@ -150,6 +189,7 @@ export default function MyRequests(): React.ReactElement {
                   <th className="px-6 py-3">Compte</th>
                   <th className="px-6 py-3">Montant</th>
                   <th className="px-6 py-3">Statut</th>
+                  <th className="px-6 py-3">Justif.</th>
                   <th className="px-6 py-3">Actions</th>
                 </tr>
               </thead>
@@ -187,6 +227,51 @@ export default function MyRequests(): React.ReactElement {
                       </span>
                     </td>
                     <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        {request.justification_url ? (
+                          <a
+                            href={request.justification_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:text-primary/80 transition-colors"
+                            title="Voir le justificatif"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </a>
+                        ) : request.status === 'disbursed' ? (
+                          <div className="relative">
+                            <input
+                              type="file"
+                              id={`upload-${request.id}`}
+                              className="hidden"
+                              accept="image/*,application/pdf"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0]
+                                if (file) handleUploadJustification(request.id, file)
+                              }}
+                              disabled={!!uploadingId}
+                            />
+                            <label
+                              htmlFor={`upload-${request.id}`}
+                              className={`cursor-pointer p-1.5 rounded-md transition-colors flex items-center justify-center ${uploadingId === request.id
+                                ? 'bg-muted text-muted-foreground'
+                                : 'bg-primary/10 text-primary hover:bg-primary/20'
+                                }`}
+                              title="Ajouter un justificatif"
+                            >
+                              {uploadingId === request.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Upload className="w-4 h-4" />
+                              )}
+                            </label>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">-</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
                       {request.status === 'disbursed' && (
                         <button
                           onClick={() => handlePrintVoucher(request)}
@@ -206,10 +291,7 @@ export default function MyRequests(): React.ReactElement {
         </div>
       )}
 
-      {/* Voucher Modal */}
-      {voucherData && (
-        <CashVoucher data={voucherData} onClose={() => setVoucherData(null)} />
-      )}
+      {voucherData && <CashVoucher data={voucherData} onClose={() => setVoucherData(null)} />}
     </div>
   )
 }

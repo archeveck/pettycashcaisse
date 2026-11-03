@@ -2,10 +2,12 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { useNotification } from '../contexts/NotificationContext'
 import { supabase } from '../services/supabase'
-import { Loader2, Check, X } from 'lucide-react'
+import { Loader2, Check, X, ExternalLink } from 'lucide-react'
 import { format } from 'date-fns'
 import { getErrorMessage } from '../utils/errorUtils'
 import { RejectionModal } from '../components/RejectionModal'
+import { EditAccountModal } from '../components/EditAccountModal'
+import { Pencil } from 'lucide-react'
 
 interface CashRequest {
   id: string
@@ -23,6 +25,8 @@ interface CashRequest {
       name: string
     }
   }
+  analytical_account_id: string
+  justification_url?: string
 }
 
 export default function Validations(): React.ReactElement {
@@ -33,6 +37,8 @@ export default function Validations(): React.ReactElement {
   const [processingId, setProcessingId] = useState<string | null>(null)
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false)
   const [requestToReject, setRequestToReject] = useState<string | null>(null)
+  const [isEditAccountModalOpen, setIsEditAccountModalOpen] = useState(false)
+  const [requestToEdit, setRequestToEdit] = useState<CashRequest | null>(null)
 
   const fetchPendingRequests = useCallback(async (): Promise<void> => {
     if (!profile) return
@@ -53,6 +59,8 @@ id,
     description,
     status,
     created_at,
+    justification_url,
+    analytical_account_id,
     requester: profiles(
         full_name
     ),
@@ -133,8 +141,10 @@ id,
         status: 'rejected',
         rejection_reason: reason
       }
-
-      const { error } = await supabase.from('cash_requests').update(updates).eq('id', requestToReject)
+      const { error } = await supabase
+        .from('cash_requests')
+        .update(updates)
+        .eq('id', requestToReject)
 
       if (error) throw error
 
@@ -144,6 +154,54 @@ id,
       setRequestToReject(null)
     } catch (err: unknown) {
       showNotification('Erreur lors du traitement de la demande : ' + getErrorMessage(err), 'error')
+    } finally {
+      setProcessingId(null)
+    }
+  }
+
+  const handleUpdateAccount = async (newAccountId: string): Promise<void> => {
+    if (!requestToEdit || !profile) return
+
+    setProcessingId(requestToEdit.id)
+
+    try {
+      const { error } = await supabase
+        .from('cash_requests')
+        .update({ analytical_account_id: newAccountId })
+        .eq('id', requestToEdit.id)
+
+      if (error) throw error
+
+      // Refresh the specific request in the list
+      const { data: updatedAccount, error: fetchError } = await supabase
+        .from('analytical_accounts')
+        .select(`
+          code,
+          name,
+          project: projects(name)
+        `)
+        .eq('id', newAccountId)
+        .single()
+
+      if (fetchError) throw fetchError
+
+      setRequests((prev) =>
+        prev.map((r) =>
+          r.id === requestToEdit.id
+            ? {
+              ...r,
+              analytical_account_id: newAccountId,
+              analytical_account: updatedAccount as any
+            }
+            : r
+        )
+      )
+
+      showNotification('Compte analytique mis à jour', 'success')
+      setIsEditAccountModalOpen(false)
+      setRequestToEdit(null)
+    } catch (err: unknown) {
+      showNotification('Erreur lors de la mise à jour du compte : ' + getErrorMessage(err), 'error')
     } finally {
       setProcessingId(null)
     }
@@ -177,9 +235,32 @@ id,
                 </div>
                 <p className="text-muted-foreground">{request.description}</p>
                 <div className="flex items-center gap-2 text-sm">
-                  <span className="bg-secondary px-2 py-1 rounded text-secondary-foreground">
+                  <span className="bg-secondary px-2 py-1 rounded text-secondary-foreground flex items-center gap-2">
                     {request.analytical_account.project.name} / {request.analytical_account.code}
+                    {profile?.role === 'controller' && (
+                      <button
+                        onClick={() => {
+                          setRequestToEdit(request)
+                          setIsEditAccountModalOpen(true)
+                        }}
+                        className="p-1 hover:bg-background/20 rounded-md transition-colors text-muted-foreground hover:text-primary"
+                        title="Modifier l'imputation"
+                      >
+                        <Pencil className="w-3 h-3" />
+                      </button>
+                    )}
                   </span>
+                  {request.justification_url && (
+                    <a
+                      href={request.justification_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary hover:bg-primary/20 rounded text-xs font-medium transition-colors"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      Voir le justificatif
+                    </a>
+                  )}
                 </div>
               </div>
 
@@ -230,6 +311,19 @@ id,
         onConfirm={handleRejectConfirm}
         isProcessing={!!processingId && processingId === requestToReject}
       />
+
+      {requestToEdit && (
+        <EditAccountModal
+          isOpen={isEditAccountModalOpen}
+          onClose={() => {
+            setIsEditAccountModalOpen(false)
+            setRequestToEdit(null)
+          }}
+          onConfirm={handleUpdateAccount}
+          currentAccountId={requestToEdit.analytical_account_id}
+          isProcessing={!!processingId && processingId === requestToEdit.id}
+        />
+      )}
     </div>
   )
 }

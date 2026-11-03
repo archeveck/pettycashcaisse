@@ -115,18 +115,18 @@ export default function NewRequest(): React.ReactElement {
     }
 
     fetchData()
-  }, [])
+  }, [showNotification])
 
-  const onSubmit = async (data: RequestFormValues): Promise<void> => {
+  const onSubmit = async (values: RequestFormValues): Promise<void> => {
     if (!user) return
-
     setIsLoading(true)
+
     try {
       const { error } = await supabase.from('cash_requests').insert({
+        amount: values.amount,
+        description: values.description,
+        analytical_account_id: values.analytical_account_id,
         requester_id: user.id,
-        amount: data.amount,
-        description: data.description,
-        analytical_account_id: data.analytical_account_id,
         status: 'pending_controller'
       })
 
@@ -143,7 +143,7 @@ export default function NewRequest(): React.ReactElement {
       // Check if it's a database validation error (from our trigger)
       if (errorMessage.includes('dépasse la limite maximale')) {
         showNotification(
-          `Le montant de ${data.amount.toLocaleString('fr-FR')} FCFA dépasse la limite maximale autorisée`,
+          `Le montant de ${values.amount.toLocaleString('fr-FR')} FCFA dépasse la limite maximale autorisée`,
           'error'
         )
       } else {

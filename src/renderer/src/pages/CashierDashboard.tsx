@@ -4,7 +4,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useNotification } from '../contexts/NotificationContext'
 import { getErrorMessage } from '../utils/errorUtils'
 import { getAppSettings } from '../services/settingsService'
-import { Loader2, DollarSign, Lock, Plus, AlertCircle, Upload, CheckCircle2, History as HistoryIcon, Printer } from 'lucide-react'
+import { Loader2, DollarSign, Lock, Plus, AlertCircle, Upload, CheckCircle2, History as HistoryIcon, Printer, RotateCcw, Search } from 'lucide-react'
 import CashVoucher, { VoucherData } from '../components/CashVoucher'
 import { uploadTransactionProof } from '../services/transactionService'
 import { format } from 'date-fns'
@@ -65,9 +65,15 @@ export default function CashierDashboard(): React.ReactElement {
 
   // Inflow modal state
   const [isInflowModalOpen, setIsInflowModalOpen] = useState(false)
+  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false)
   const [inflowAmount, setInflowAmount] = useState(0)
   const [inflowDescription, setInflowDescription] = useState('')
   const [isProcessingInflow, setIsProcessingInflow] = useState(false)
+
+  // Pending disbursements filters
+  const [searchTerm, setSearchTerm] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
 
   // Upload state
   const [isUploadingProof, setIsUploadingProof] = useState<string | null>(null)
@@ -188,7 +194,24 @@ export default function CashierDashboard(): React.ReactElement {
     }
   }
 
-  const handlePrintVoucher = (transaction: Transaction): void => {
+  const filteredRequests = approvedRequests.filter((req) => {
+    const day = format(new Date(req.created_at), 'yyyy-MM-dd')
+    if (dateFrom && day < dateFrom) return false
+    if (dateTo && day > dateTo) return false
+    const term = searchTerm.trim().toLowerCase()
+    if (!term) return true
+    return [
+      req.requester?.full_name,
+      req.description,
+      req.analytical_account?.code,
+      req.analytical_account?.name,
+      req.analytical_account?.project?.name,
+      String(req.amount)
+    ].some((v) => v?.toLowerCase().includes(term))
+  })
+  const hasFilters = !!(searchTerm || dateFrom || dateTo)
+
+  const handlePrintVoucher =(transaction: Transaction): void => {
     if (transaction.type === 'outflow' && transaction.request) {
       setVoucherData({
         transactionId: transaction.id,
@@ -330,6 +353,45 @@ export default function CashierDashboard(): React.ReactElement {
     setIsInflowModalOpen(true)
   }
 
+  const openReturnModal = (): void => {
+    setInflowAmount(0)
+    setInflowDescription('')
+    setIsReturnModalOpen(true)
+  }
+
+  const handleReturnToCash = async (): Promise<void> => {
+    if (!profile || inflowAmount <= 0) {
+      showNotification('Veuillez entrer un montant valide', 'warning')
+      return
+    }
+
+    setIsProcessingInflow(true)
+
+    try {
+      const { error } = await supabase.from('cash_transactions').insert({
+        type: 'inflow',
+        amount: inflowAmount,
+        description: `RETOUR: ${inflowDescription || 'Retour en caisse'}`,
+        created_by: profile.id,
+        date: new Date().toISOString()
+      })
+
+      if (error) throw error
+
+      // Reset and close modal
+      setIsReturnModalOpen(false)
+      setInflowAmount(0)
+      setInflowDescription('')
+      fetchData()
+      showNotification('Retour en caisse enregistré avec succès !', 'success')
+    } catch (err: unknown) {
+      console.error('Return error:', err)
+      showNotification(`Échec de l'enregistrement du retour : ${getErrorMessage(err)}`, 'error')
+    } finally {
+      setIsProcessingInflow(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -353,6 +415,13 @@ export default function CashierDashboard(): React.ReactElement {
             <Plus className="w-5 h-5" />
           </button>
           <button
+            onClick={openReturnModal}
+            className="p-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            title="Retour en Caisse"
+          >
+            <RotateCcw className="w-5 h-5" />
+          </button>
+          <button
             onClick={() => (window.location.hash = '#/cashier/closure')}
             className="p-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
             title="Clôture Journalière"
@@ -367,18 +436,63 @@ export default function CashierDashboard(): React.ReactElement {
         <div className="space-y-4">
           <h2 className="text-xl font-semibold flex items-center gap-2">
             <DollarSign className="w-5 h-5" />
-            Décaissements en Attente ({approvedRequests.length})
+            Décaissements en Attente ({filteredRequests.length}
+            {hasFilters ? `/${approvedRequests.length}` : ''})
           </h2>
+
+          <div className="flex flex-wrap gap-2 items-center">
+            <div className="relative flex-1 min-w-[180px]">
+              <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="search"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Rechercher (nom, motif, compte, montant)…"
+                aria-label="Rechercher un décaissement"
+                className="w-full pl-8 pr-3 py-1.5 text-sm bg-background border border-input rounded-md"
+              />
+            </div>
+            <input
+              type="date"
+              value={dateFrom}
+              max={dateTo || undefined}
+              onChange={(e) => setDateFrom(e.target.value)}
+              aria-label="Date de début"
+              className="px-2 py-1.5 text-sm bg-background border border-input rounded-md"
+            />
+            <input
+              type="date"
+              value={dateTo}
+              min={dateFrom || undefined}
+              onChange={(e) => setDateTo(e.target.value)}
+              aria-label="Date de fin"
+              className="px-2 py-1.5 text-sm bg-background border border-input rounded-md"
+            />
+            {hasFilters && (
+              <button
+                onClick={() => {
+                  setSearchTerm('')
+                  setDateFrom('')
+                  setDateTo('')
+                }}
+                className="px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground"
+              >
+                Réinitialiser
+              </button>
+            )}
+          </div>
 
           {isLoading ? (
             <Loader2 className="w-6 h-6 animate-spin" />
-          ) : approvedRequests.length === 0 ? (
+          ) : filteredRequests.length === 0 ? (
             <p className="text-muted-foreground">
-              Aucune demande approuvée en attente de décaissement.
+              {hasFilters
+                ? 'Aucune demande ne correspond aux filtres.'
+                : 'Aucune demande approuvée en attente de décaissement.'}
             </p>
           ) : (
             <div className="space-y-3">
-              {approvedRequests.map((req) => (
+              {filteredRequests.map((req) => (
                 <div key={req.id} className="p-4 bg-card border border-border rounded-lg shadow-sm">
                   <div className="flex justify-between items-start mb-2">
                     <div>
@@ -642,6 +756,72 @@ export default function CashierDashboard(): React.ReactElement {
                       <>
                         <Plus className="w-4 h-4" />
                         Ajouter l&apos;Entrée
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      }
+
+      {/* Return to Cash Modal */}
+      {
+        isReturnModalOpen && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-card p-6 rounded-lg border border-border shadow-lg max-w-md w-full">
+              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                <RotateCcw className="w-5 h-5 text-blue-600" />
+                Retour en Caisse
+              </h2>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Montant à retourner (FCFA)</label>
+                  <input
+                    type="number"
+                    value={inflowAmount || ''}
+                    onChange={(e) => setInflowAmount(Number(e.target.value))}
+                    placeholder="Entrer le montant"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    autoFocus
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Raison du retour</label>
+                  <textarea
+                    value={inflowDescription}
+                    onChange={(e) => setInflowDescription(e.target.value)}
+                    placeholder="Ex: Reliquat mission, annulation achat..."
+                    className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  />
+                </div>
+
+                <div className="flex gap-2 justify-end pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setIsReturnModalOpen(false)}
+                    disabled={isProcessingInflow}
+                    className="px-4 py-2 border border-border rounded-md hover:bg-secondary transition-colors disabled:opacity-50"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    onClick={handleReturnToCash}
+                    disabled={isProcessingInflow || inflowAmount <= 0}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {isProcessingInflow ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Traitement...
+                      </>
+                    ) : (
+                      <>
+                        <RotateCcw className="w-4 h-4" />
+                        Confirmer le Retour
                       </>
                     )}
                   </button>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../services/supabase'
@@ -27,9 +27,12 @@ interface Transaction {
     }
   }
   analytical_account?: {
+    id: string
     code: string
     name: string
+    project_id: string
     project: {
+      id: string
       name: string
     }
   }
@@ -38,10 +41,14 @@ interface Transaction {
 export default function Transactions(): React.ReactElement {
   const { profile } = useAuth()
   const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [projects, setProjects] = useState<{ id: string, name: string }[]>([])
+  const [accounts, setAccounts] = useState<{ id: string, name: string, code: string, project_id: string }[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [typeFilter, setTypeFilter] = useState<'all' | 'inflow' | 'outflow'>('all')
+  const [selectedProject, setSelectedProject] = useState('')
+  const [selectedAccount, setSelectedAccount] = useState('')
   const [isUploadingProof, setIsUploadingProof] = useState<string | null>(null)
   const [showMissingProof, setShowMissingProof] = useState(false)
   const [searchParams] = useSearchParams()
@@ -61,15 +68,18 @@ export default function Transactions(): React.ReactElement {
 
     setStartDate(start.toISOString().split('T')[0])
     setEndDate(end.toISOString().split('T')[0])
+
+    // Load filter options
+    const loadFilters = async (): Promise<void> => {
+      const { data: pData } = await supabase.from('projects').select('id, name').eq('active', true)
+      if (pData) setProjects(pData)
+      const { data: aData } = await supabase.from('analytical_accounts').select('id, name, code, project_id')
+      if (aData) setAccounts(aData)
+    }
+    loadFilters()
   }, [searchParams])
 
-  useEffect(() => {
-    if (startDate && endDate && profile) {
-      fetchTransactions()
-    }
-  }, [startDate, endDate, typeFilter, showMissingProof, profile])
-
-  const fetchTransactions = async (): Promise<void> => {
+  const fetchTransactions = useCallback(async (): Promise<void> => {
     if (!profile) return
 
     setIsLoading(true)
@@ -89,9 +99,12 @@ export default function Transactions(): React.ReactElement {
             )
           ),
           analytical_account:analytical_accounts (
+            id,
             code,
             name,
+            project_id,
             project:projects (
+              id,
               name
             )
           )
@@ -108,6 +121,10 @@ export default function Transactions(): React.ReactElement {
 
       if (showMissingProof) {
         query = query.eq('type', 'outflow').is('proof_document_url', null)
+      }
+
+      if (selectedAccount) {
+        query = query.eq('analytical_account_id', selectedAccount)
       }
 
       // For requesters, only show their own transactions (outflows from their requests)
@@ -134,13 +151,26 @@ export default function Transactions(): React.ReactElement {
 
       if (error) throw error
 
-      setTransactions(data as unknown as Transaction[])
+      let filteredData = data as unknown as Transaction[]
+
+      // Local filter for project
+      if (selectedProject) {
+        filteredData = filteredData.filter((t) => t.analytical_account?.project_id === selectedProject)
+      }
+
+      setTransactions(filteredData)
     } catch (err) {
       console.error('Error fetching transactions:', err)
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [profile, startDate, endDate, typeFilter, showMissingProof, selectedAccount, selectedProject])
+
+  useEffect(() => {
+    if (startDate && endDate && profile) {
+      fetchTransactions()
+    }
+  }, [startDate, endDate, profile, fetchTransactions])
 
   const handleUpdateProof = async (transactionId: string, file: File): Promise<void> => {
     console.log('Starting proof update for transaction:', transactionId, file.name)
@@ -176,7 +206,7 @@ export default function Transactions(): React.ReactElement {
       {/* Filters */}
       <div className="p-4 bg-card rounded-lg border border-border shadow-sm">
         <h3 className="font-semibold mb-3">Filtres</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div className="space-y-2">
             <label className="text-sm font-medium">Date de Début</label>
             <input
@@ -207,7 +237,42 @@ export default function Transactions(): React.ReactElement {
               <option value="outflow">Sortie</option>
             </select>
           </div>
-          <div className="flex items-end pb-1">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Projet</label>
+            <select
+              value={selectedProject}
+              onChange={(e) => {
+                setSelectedProject(e.target.value)
+                setSelectedAccount('')
+              }}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              <option value="">Tous les Projets</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Compte</label>
+            <select
+              value={selectedAccount}
+              onChange={(e) => setSelectedAccount(e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              <option value="">Tous les Comptes</option>
+              {accounts
+                .filter((a) => !selectedProject || a.project_id === selectedProject)
+                .map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.code} - {a.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+          <div className="flex items-end pb-1 md:col-span-5">
             <label className="flex items-center gap-2 cursor-pointer group">
               <input
                 type="checkbox"
@@ -308,8 +373,8 @@ export default function Transactions(): React.ReactElement {
                     <td className="py-3">
                       <span
                         className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${t.type === 'inflow'
-                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                          : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                            : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
                           }`}
                       >
                         {t.type === 'inflow' ? (

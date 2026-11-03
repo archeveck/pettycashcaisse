@@ -56,7 +56,7 @@ export function useDesktopNotifications(): {
         icon: options.icon || '/icon.png',
         badge: '/icon.png',
         tag: 'validation-request', // Prevents duplicate notifications
-        requireInteraction: false
+        requireInteraction: true
       })
 
       console.log('[useDesktopNotifications] Notification created successfully')
@@ -73,10 +73,10 @@ export function useDesktopNotifications(): {
         notification.close()
       }
 
-      // Auto-close after 10 seconds
+      // Auto-close after 5 minutes
       setTimeout(() => {
         notification.close()
-      }, 10000)
+      }, 300000)
     } catch (error) {
       console.error('[useDesktopNotifications] Error showing desktop notification:', error)
     }

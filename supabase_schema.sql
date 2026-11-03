@@ -57,6 +57,7 @@ create table if not exists public.cash_requests (
   cfo_approval_at timestamptz,
   rejection_reason text,
   
+  justification_url text,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -236,18 +237,18 @@ create policy "Authenticated users can view proof documents"
 on storage.objects for select
 using (bucket_id = 'proof-documents' and auth.role() = 'authenticated');
 
-create policy "Cashiers can upload proof documents"
+create policy "Staff and Requesters can upload proof documents"
 on storage.objects for insert
 with check (
   bucket_id = 'proof-documents' and
-  exists (select 1 from public.profiles where id = auth.uid() and role in ('cashier', 'admin'))
+  exists (select 1 from public.profiles where id = auth.uid() and role in ('requester', 'cashier', 'admin', 'controller', 'cfo'))
 );
 
-create policy "Cashiers can update proof documents"
+create policy "Staff and Requesters can update proof documents"
 on storage.objects for update
 using (
   bucket_id = 'proof-documents' and
-  exists (select 1 from public.profiles where id = auth.uid() and role in ('cashier', 'admin'))
+  exists (select 1 from public.profiles where id = auth.uid() and role in ('requester', 'cashier', 'admin', 'controller', 'cfo'))
 );
 
 -- Functions & Triggers
