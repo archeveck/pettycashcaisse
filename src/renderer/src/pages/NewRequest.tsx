@@ -34,6 +34,7 @@ const createRequestSchema = (
 type RequestFormValues = z.infer<ReturnType<typeof createRequestSchema>>
 
 interface ProjectOption {
+  id: string
   code: string
   name: string
 }
@@ -42,21 +43,10 @@ interface AnalyticalAccount {
   id: string
   name: string
   code: string
+  project_id: string
   project: {
     name: string
-    code: string
-  }
-}
-
-// Type for Supabase response (project is returned as an array)
-interface SupabaseAnalyticalAccount {
-  id: string
-  name: string
-  code: string
-  project: {
-    name: string
-    code: string
-  }[]
+  } | null
 }
 
 export default function NewRequest(): React.ReactElement {
@@ -81,7 +71,7 @@ export default function NewRequest(): React.ReactElement {
   })
 
   const visibleAccounts = selectedProject
-    ? accounts.filter((a) => a.project.code === selectedProject)
+    ? accounts.filter((a) => a.project_id === selectedProject)
     : accounts
 
   // Fetch app settings and analytical accounts on mount
@@ -96,7 +86,7 @@ export default function NewRequest(): React.ReactElement {
         // Fetch all projects (independently of their analytical accounts)
         const { data: projectData, error: projectError } = await supabase
           .from('projects')
-          .select('code, name')
+          .select('id, code, name')
           .order('name', { ascending: true })
         if (projectError) throw projectError
         setProjects(projectData || [])
@@ -109,9 +99,9 @@ export default function NewRequest(): React.ReactElement {
             id,
             name,
             code,
+            project_id,
             project:projects (
-              name,
-              code
+              name
             )
           `
           )
@@ -119,18 +109,7 @@ export default function NewRequest(): React.ReactElement {
 
         if (error) throw error
 
-        // Transform data to match interface
-        // Supabase returns project as an array, but we need a single object
-        const transformedData: AnalyticalAccount[] = (data || []).map(
-          (account: SupabaseAnalyticalAccount) => ({
-            id: account.id,
-            name: account.name,
-            code: account.code,
-            project: account.project?.[0] || { name: '', code: '' }
-          })
-        )
-
-        setAccounts(transformedData)
+        setAccounts((data as unknown as AnalyticalAccount[]) || [])
       } catch (err: unknown) {
         console.error('Error fetching data:', err)
         showNotification(`Erreur lors du chargement des données: ${getErrorMessage(err)}`, 'error')
@@ -252,7 +231,7 @@ export default function NewRequest(): React.ReactElement {
             >
               <option value="">Tous les projets</option>
               {projects.map((project) => (
-                <option key={project.code} value={project.code}>
+                <option key={project.id} value={project.id}>
                   {project.code} - {project.name}
                 </option>
               ))}
@@ -272,7 +251,7 @@ export default function NewRequest(): React.ReactElement {
               <option value="">Sélectionner un compte...</option>
               {visibleAccounts.map((account) => (
                 <option key={account.id} value={account.id}>
-                  {account.code} - {account.name} ({account.project.name})
+                  {account.code} - {account.name} ({account.project?.name})
                 </option>
               ))}
             </select>

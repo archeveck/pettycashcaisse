@@ -1,8 +1,46 @@
 import { createClient } from '@supabase/supabase-js'
 
-// These should ideally be in .env, but for now we'll use placeholders or expect them to be set.
-// The user will need to provide these.
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+const SERVER_CONFIG_KEY = 'supabase_server_config'
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export interface ServerConfig {
+  url: string
+  anonKey: string
+}
+
+const envConfig: ServerConfig = {
+  url: import.meta.env.VITE_SUPABASE_URL || '',
+  anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+}
+
+// Configuration saisie par l'administrateur (prioritaire sur le fichier .env)
+function readOverride(): ServerConfig | null {
+  try {
+    const raw = localStorage.getItem(SERVER_CONFIG_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Partial<ServerConfig>
+    return parsed.url && parsed.anonKey ? { url: parsed.url, anonKey: parsed.anonKey } : null
+  } catch {
+    return null
+  }
+}
+
+export function getServerConfig(): ServerConfig {
+  return readOverride() ?? envConfig
+}
+
+export function isServerConfigOverridden(): boolean {
+  return readOverride() !== null
+}
+
+// Le client est créé au démarrage : l'application doit être rechargée après modification.
+export function saveServerConfig(config: ServerConfig): void {
+  localStorage.setItem(SERVER_CONFIG_KEY, JSON.stringify(config))
+}
+
+export function resetServerConfig(): void {
+  localStorage.removeItem(SERVER_CONFIG_KEY)
+}
+
+const { url, anonKey } = getServerConfig()
+
+export const supabase = createClient(url, anonKey)
