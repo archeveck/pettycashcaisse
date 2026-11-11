@@ -44,6 +44,7 @@ import {
 import { syncOdooData } from '../services/odooService'
 import { getErrorMessage } from '../utils/errorUtils'
 import { clsx } from 'clsx'
+import ServerConfigForm from '../components/ServerConfigForm'
 
 type TabType = 'app' | 'projects' | 'accounts' | 'accounting' | 'suppliers' | 'users' | 'odoo'
 
@@ -351,6 +352,11 @@ export default function Settings(): React.ReactElement {
                   )}
                   Enregistrer les Paramètres
                 </button>
+              </div>
+
+              <div className="p-6 bg-card rounded-lg border border-border shadow-sm space-y-4">
+                <h2 className="text-xl font-semibold">Serveur de base de données</h2>
+                <ServerConfigForm />
               </div>
             </div>
           )}

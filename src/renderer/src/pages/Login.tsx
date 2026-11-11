@@ -4,7 +4,8 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { supabase } from '../services/supabase'
-import { Loader2, Wallet, Eye, EyeOff } from 'lucide-react'
+import { Loader2, Wallet, Eye, EyeOff, Server } from 'lucide-react'
+import ServerConfigForm from '../components/ServerConfigForm'
 import { getErrorMessage } from '../utils/errorUtils'
 
 const loginSchema = z.object({
@@ -21,6 +22,7 @@ export default function Login(): React.ReactElement {
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [showServerConfig, setShowServerConfig] = useState(false)
 
   const {
     register,
@@ -142,8 +144,19 @@ export default function Login(): React.ReactElement {
           </button>
         </form>
 
-        <div className="pt-4 text-center">
-          <p className="text-xs text-muted-foreground">Système sécurisé de gestion de caisse</p>
+        <div className="pt-4 border-t border-border/50 space-y-4">
+          <button
+            type="button"
+            onClick={() => setShowServerConfig(!showServerConfig)}
+            className="flex items-center mx-auto text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Server className="w-3 h-3 mr-1" />
+            Paramètres du serveur
+          </button>
+          {showServerConfig && <ServerConfigForm />}
+          <p className="text-xs text-muted-foreground text-center">
+            Système sécurisé de gestion de caisse
+          </p>
         </div>
       </div>
     </div>

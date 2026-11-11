@@ -22,6 +22,7 @@ import { UpdateNotification } from './components/UpdateNotification'
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { isSupabaseConfigured } from './services/supabase'
+import ServerConfigForm from './components/ServerConfigForm'
 import { AlertTriangle } from 'lucide-react'
 
 const queryClient = new QueryClient()
@@ -45,6 +46,9 @@ function App(): React.ReactElement {
             <li>VITE_SUPABASE_URL : {partialUrl}</li>
             <li>VITE_SUPABASE_ANON_KEY : {import.meta.env.VITE_SUPABASE_ANON_KEY ? 'configurée' : 'vide'}</li>
           </ul>
+        </div>
+        <div className="mt-4 w-full max-w-md rounded-md bg-white p-4 text-left shadow-sm">
+          <ServerConfigForm />
         </div>
       </div>
     )
